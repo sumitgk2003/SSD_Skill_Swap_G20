@@ -66,14 +66,14 @@ const Header = () => {
       <Link to="/" style={logoStyle}>SkillSwap</Link>
       <nav style={navStyle}>
         <NavLink to="/browse" style={getNavLinkStyle}>Browse Skills</NavLink>
+        <NavLink to="/dashboard" style={getNavLinkStyle}>Dashboard</NavLink>
+        <NavLink to="/profile" style={getNavLinkStyle}>Profile</NavLink>
+        <NavLink to="/find-matches" style={getNavLinkStyle}>Your Matches</NavLink>
         {/* You can add other public links like 'About Us' here */}
       </nav>
       <div>
         {isAuthenticated ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <NavLink to="/dashboard" style={getNavLinkStyle}>Dashboard</NavLink>
-            <NavLink to="/profile" style={getNavLinkStyle}>Profile</NavLink>
-            <NavLink to="/find-matches" style={getNavLinkStyle}>Find Matches</NavLink>
             <button 
              onClick={() => dispatch(logout())}
              style={{...buttonStyle, backgroundColor: '#f0eaff', color: '#6a5acd', marginLeft: '1rem'}}

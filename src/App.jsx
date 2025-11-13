@@ -1,15 +1,16 @@
 import React from 'react';
 import { Routes, Route, Outlet } from 'react-router-dom';
 import Header from './components/Header';
-import HomePage from './components/HomePage';
-import BrowseSkillsPage from './components/BrowseSkillsPage';
-import LoginPage from './components/LoginPage';
-import SignUpPage from './components/SignUpPage';
-import DashboardPage from './components/DashboardPage';
-import ProfilePage from './components/ProfilePage';
+import HomePage from './pages/HomePage';
+import BrowseSkillsPage from './pages/BrowseSkillsPage';
+import LoginPage from './pages/LoginPage';
+import SignUpPage from './pages/SignUpPage';
+import DashboardPage from './pages/DashboardPage';
+import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
-import CreateProfilePage from './components/CreateProfilePage';
-import FindMatchesPage from './components/FindMatchesPage';
+import CreateProfilePage from './pages/CreateProfilePage';
+import FindMatchesPage from './pages/FindMatchesPage';
+
 
 // This component provides a consistent layout with a header for all pages.
 const AppLayout = () => {
