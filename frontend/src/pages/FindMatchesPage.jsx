@@ -144,6 +144,7 @@ const FindMatchesPage = () => {
   const [meetType, setMeetType] = useState('online');
   const [date, setDate] = useState(new Date().toISOString().slice(0,10));
   const [time, setTime] = useState('09:00');
+  const [duration, setDuration] = useState(30);
   const [note, setNote] = useState('');
   const [errors, setErrors] = useState({});
   const [confirmation, setConfirmation] = useState('');
@@ -214,6 +215,7 @@ const FindMatchesPage = () => {
     const e = {};
     if (!date) e.date = 'Please pick a date.';
     if (!time) e.time = 'Please pick a time.';
+    if (!duration || duration <= 0) e.duration = 'Duration must be a positive number.';
     const dt = new Date(`${date}T${time}:00`);
     if (isNaN(dt.getTime())) e.date = 'Invalid date/time.';
     if (dt.getTime() < Date.now() - 1000) e.time = 'Meeting time must be in the future.';
@@ -247,11 +249,12 @@ const FindMatchesPage = () => {
       type: meetType,
       date,
       time,
+      duration,
       note,
       with: selectedUser ? { id: selectedUser.id, name: selectedUser.name } : null,
     };
     console.log('Create meeting payload:', payload);
-    setConfirmation(`Meeting scheduled ${meetType} ${date} ${time}${selectedUser ? ' with ' + selectedUser.name : ''}.`);
+    setConfirmation(`Meeting scheduled ${meetType} ${date} ${time} for ${duration} minutes${selectedUser ? ' with ' + selectedUser.name : ''}.`);
     setTimeout(() => setConfirmation(''), 5000);
     setSchedulerOpen(false);
   };
@@ -370,6 +373,28 @@ const FindMatchesPage = () => {
                   </div>
                   {errors.time && <div style={styles.errorStyle}>{errors.time}</div>}
                 </div>
+
+                <div style={{ flex: '1 1 140px', minWidth: 120 }}>
+                  <div style={styles.label}>Duration</div>
+
+                  <div style={{ ...styles.clickableField, position: 'relative' }}>
+                    <div style={{ flex: 1 }}>
+                      <input
+                        type="number"
+                        value={duration}
+                        onChange={(e) => setDuration(parseInt(e.target.value, 10))}
+                        style={styles.durationInput}
+                        min="1"
+                      />
+                      <div style={{ fontSize: 13, color: '#888' }}>Tap to change</div>
+                    </div>
+
+                    <div style={{ fontSize: 15, color: '#222', marginRight: 6 }}>min</div>
+                  </div>
+
+                  {errors.duration && <div style={styles.errorStyle}>{errors.duration}</div>}
+                </div>
+
               </div>
 
               <div style={{ marginTop: 12 }}>
@@ -650,6 +675,19 @@ const styles = {
   errorStyle: { color: '#d23', marginTop: 6, fontSize: 13 },
   cancelBtn: { padding: '0.7rem 1rem', borderRadius: 8, border: '1px solid #e6e6ea', background: '#fff', cursor: 'pointer', fontSize: 15 },
   createBtn: { padding: '0.7rem 1.05rem', borderRadius: 8, border: 'none', background: '#6a5acd', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 15 },
+ durationInput: {
+  fontSize: 15,
+  color: '#222',
+  fontWeight: 600,
+  border: 'none',
+  background: 'transparent',
+  padding: 0,
+  margin: 0,
+  width: '100%',
+  outline: 'none',
+  appearance: 'textfield',
+},
+
 };
 
 export default FindMatchesPage;
