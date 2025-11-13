@@ -10,6 +10,7 @@ import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
 import CreateProfilePage from './pages/CreateProfilePage';
 import FindMatchesPage from './pages/FindMatchesPage';
+import MeetScheduler from './pages/MeetScheduler';
 
 // This component provides a consistent layout with a header for all pages.
 const AppLayout = () => {
@@ -41,6 +42,7 @@ const App = () => {
         <Route path="browse" element={<BrowseSkillsPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="signup" element={<SignUpPage />} />
+        <Route path="schedule" element={<MeetScheduler/>} />
 
         {/* Protected Routes - only accessible when logged in */}
         <Route element={<ProtectedRoute />}>
