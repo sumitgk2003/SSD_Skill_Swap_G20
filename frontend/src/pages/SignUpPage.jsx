@@ -2,7 +2,7 @@
 import React from 'react';
 import { useDispatch } from 'react-redux';
 import { Link } from 'react-router-dom';
-import { login } from '../store/authSlice';
+import { setUser } from '../store/authSlice'; // Import setUser action
 
 const SignUpPage = () => {
   const dispatch = useDispatch();
@@ -10,7 +10,8 @@ const SignUpPage = () => {
   const handleSignUp = (e) => {
     e.preventDefault(); // Prevents the form from reloading the page
     // In a real app, you'd send user data to your backend here
-    dispatch(login()); // Simulate login after successful signup
+    // Simulate login after successful signup
+    dispatch(setUser({ name: 'Test User', email: 'test@example.com' })); 
   };
 
   const pageStyle = {

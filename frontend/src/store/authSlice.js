@@ -1,24 +1,25 @@
+import { createSlice } from "@reduxjs/toolkit";
 
-import { createSlice } from '@reduxjs/toolkit';
+const initialState={
+  user:null,
+  skills:[],
+  interests:[],
+}
 
-// This slice manages the user's authentication state.
-export const authSlice = createSlice({
-  name: 'auth',
-  initialState: {
-    isAuthenticated: false,
-  },
-  reducers: {
-    login: (state) => {
-      state.isAuthenticated = true;
+const authSlice = createSlice({
+  name:"auth",
+  initialState,
+  reducers:{
+    setUser:(state,action)=>{
+      state.user = action.payload;
     },
-    logout: (state) => {
-      state.isAuthenticated = false;
+    setSkills:(state,action)=>{
+      state.skills = action.payload;
     },
-  },
-});
-
-// Export the actions to be used in components
-export const { login, logout } = authSlice.actions;
-
-// Export the reducer to be used in the store
+    setInterests:(state,action)=>{
+      state.interests = action.payload;
+    }
+  }
+})
+export const {setUser,setSkills,setInterests}=authSlice.actions;
 export default authSlice.reducer;

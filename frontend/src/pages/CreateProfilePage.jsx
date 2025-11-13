@@ -1,28 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { setSkills, setInterests } from '../store/authSlice';
 
 const CreateProfilePage = () => {
+  const dispatch = useDispatch();
+  const userSkills = useSelector((state) => state.auth.skills);
+  const userInterests = useSelector((state) => state.auth.interests);
+
   const [bio, setBio] = useState('');
-  const [teachingSkill, setTeachingSkill] = useState('');
-  const [learningSkill, setLearningSkill] = useState('');
-  const [teachingSkills, setTeachingSkills] = useState(['React', 'Node.js']);
-  const [learningSkills, setLearningSkills] = useState(['Pottery']);
+  const [teachingSkillInput, setTeachingSkillInput] = useState('');
+  const [learningSkillInput, setLearningSkillInput] = useState('');
+  const [currentTeachingSkills, setCurrentTeachingSkills] = useState([]);
+  const [currentLearningSkills, setCurrentLearningSkills] = useState([]);
+
+  useEffect(() => {
+    setCurrentTeachingSkills(userSkills);
+    setCurrentLearningSkills(userInterests);
+    console.log('CreateProfilePage: Initial userSkills from Redux:', userSkills);
+    console.log('CreateProfilePage: Initial userInterests from Redux:', userInterests);
+  }, [userSkills, userInterests]);
 
   const addSkill = (type) => {
-    if (type === 'teach' && teachingSkill && !teachingSkills.includes(teachingSkill)) {
-      setTeachingSkills([...teachingSkills, teachingSkill]);
-      setTeachingSkill('');
-    } else if (type === 'learn' && learningSkill && !learningSkills.includes(learningSkill)) {
-      setLearningSkills([...learningSkills, learningSkill]);
-      setLearningSkill('');
+    if (type === 'teach' && teachingSkillInput && !currentTeachingSkills.includes(teachingSkillInput)) {
+      const newSkills = [...currentTeachingSkills, teachingSkillInput];
+      setCurrentTeachingSkills(newSkills);
+      setTeachingSkillInput('');
+      console.log('CreateProfilePage: Added teaching skill. New local state:', newSkills);
+    } else if (type === 'learn' && learningSkillInput && !currentLearningSkills.includes(learningSkillInput)) {
+      const newInterests = [...currentLearningSkills, learningSkillInput];
+      setCurrentLearningSkills(newInterests);
+      setLearningSkillInput('');
+      console.log('CreateProfilePage: Added learning skill. New local state:', newInterests);
     }
   };
   
   const removeSkill = (skillToRemove, type) => {
       if (type === 'teach') {
-          setTeachingSkills(teachingSkills.filter(skill => skill !== skillToRemove));
+          const newSkills = currentTeachingSkills.filter(skill => skill !== skillToRemove);
+          setCurrentTeachingSkills(newSkills);
+          console.log('CreateProfilePage: Removed teaching skill. New local state:', newSkills);
       } else {
-          setLearningSkills(learningSkills.filter(skill => skill !== skillToRemove));
+          const newInterests = currentLearningSkills.filter(skill => skill !== skillToRemove);
+          setCurrentLearningSkills(newInterests);
+          console.log('CreateProfilePage: Removed learning skill. New local state:', newInterests);
       }
+  };
+
+  const handleSaveProfile = () => {
+    console.log('CreateProfilePage: Saving profile...');
+    console.log('CreateProfilePage: Dispatching setSkills with:', currentTeachingSkills);
+    dispatch(setSkills(currentTeachingSkills));
+    console.log('CreateProfilePage: Dispatching setInterests with:', currentLearningSkills);
+    dispatch(setInterests(currentLearningSkills));
+    // In a real application, you would also send this data to a backend API
+    alert('Profile Saved!');
   };
 
   const pageStyle = { padding: '3rem', maxWidth: '800px', margin: '2rem auto' };
@@ -55,11 +86,11 @@ const CreateProfilePage = () => {
         <div>
           <h2 style={sectionTitleStyle}>Skills You Can Teach</h2>
           <div style={inputGroupStyle}>
-            <input type="text" value={teachingSkill} onChange={(e) => setTeachingSkill(e.target.value)} placeholder="e.g., Python Programming" style={inputStyle} />
+            <input type="text" value={teachingSkillInput} onChange={(e) => setTeachingSkillInput(e.target.value)} placeholder="e.g., Python Programming" style={inputStyle} />
             <button onClick={() => addSkill('teach')} style={buttonStyle}>Add</button>
           </div>
           <div style={skillTagContainerStyle}>
-            {teachingSkills.map(skill => (
+            {currentTeachingSkills.map(skill => (
               <div key={skill} style={skillTagStyle}>
                 {skill}
                 <button onClick={() => removeSkill(skill, 'teach')} style={removeBtnStyle}>×</button>
@@ -72,11 +103,11 @@ const CreateProfilePage = () => {
         <div style={{ marginTop: '2.5rem' }}>
           <h2 style={sectionTitleStyle}>Skills You Want To Learn</h2>
           <div style={inputGroupStyle}>
-            <input type="text" value={learningSkill} onChange={(e) => setLearningSkill(e.target.value)} placeholder="e.g., Play Guitar" style={inputStyle} />
+            <input type="text" value={learningSkillInput} onChange={(e) => setLearningSkillInput(e.target.value)} placeholder="e.g., Play Guitar" style={inputStyle} />
             <button onClick={() => addSkill('learn')} style={buttonStyle}>Add</button>
           </div>
           <div style={skillTagContainerStyle}>
-            {learningSkills.map(skill => (
+            {currentLearningSkills.map(skill => (
               <div key={skill} style={skillTagStyle}>
                 {skill}
                 <button onClick={() => removeSkill(skill, 'learn')} style={removeBtnStyle}>×</button>
@@ -86,7 +117,7 @@ const CreateProfilePage = () => {
         </div>
         
         <div style={{textAlign: 'center', marginTop: '3rem'}}>
-            <button style={{...buttonStyle, padding: '0.8rem 3rem', fontSize: '1.1rem'}}>Save Profile</button>
+            <button onClick={handleSaveProfile} style={{...buttonStyle, padding: '0.8rem 3rem', fontSize: '1.1rem'}}>Save Profile</button>
         </div>
       </div>
     </div>

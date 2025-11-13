@@ -1,16 +1,18 @@
 
 import React from 'react';
 import { useDispatch } from 'react-redux';
-import { Link } from 'react-router-dom';
-import { login } from '../store/authSlice';
+import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
+import { setUser } from '../store/authSlice'; // Import setUser action
 
 const LoginPage = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate(); // Initialize useNavigate
   
   const handleLogin = (e) => {
     e.preventDefault(); // Prevents the form from reloading the page
     // In a real app, you would verify credentials here
-    dispatch(login());
+    dispatch(setUser({ name: 'Logged In User'}));
+    navigate('/dashboard'); // Redirect to dashboard after login
   };
 
   const pageStyle = {

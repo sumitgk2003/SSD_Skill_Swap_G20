@@ -1,8 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux'; // Import useSelector
 
 const ProfilePage = () => {
   const navigate = useNavigate();
+  const userSkills = useSelector((state) => state.auth.skills); // Get skills from Redux
+  const userInterests = useSelector((state) => state.auth.interests); // Get interests from Redux
 
   const pageStyle = {
     padding: '3rem',
@@ -88,11 +91,28 @@ const ProfilePage = () => {
       </div>
 
       <div style={skillsSectionStyle}>
-        <h2 style={skillsTitleStyle}>Skills Taught</h2>
+        <h2 style={skillsTitleStyle}>Skills You Can Teach</h2>
         <div>
-            <span style={skillTagStyle}>Creative Writing</span>
-            <span style={skillTagStyle}>Web Development</span>
-            <span style={skillTagStyle}>React.js</span>
+            {userSkills.length > 0 ? (
+                userSkills.map((skill, index) => (
+                    <span key={index} style={skillTagStyle}>{skill}</span>
+                ))
+            ) : (
+                <p>No skills added yet. Go to "Edit Profile" to add some!</p>
+            )}
+        </div>
+      </div>
+
+      <div style={skillsSectionStyle}>
+        <h2 style={skillsTitleStyle}>Skills You Want To Learn</h2>
+        <div>
+            {userInterests.length > 0 ? (
+                userInterests.map((interest, index) => (
+                    <span key={index} style={skillTagStyle}>{interest}</span>
+                ))
+            ) : (
+                <p>No interests added yet. Go to "Edit Profile" to add some!</p>
+            )}
         </div>
       </div>
     </div>

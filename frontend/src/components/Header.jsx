@@ -1,10 +1,10 @@
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { NavLink, Link } from 'react-router-dom';
-import { logout } from '../store/authSlice';
+import { setUser } from '../store/authSlice'; // Import setUser action
 
 const Header = () => {
-  const { isAuthenticated } = useSelector((state) => state.auth);
+  const { user } = useSelector((state) => state.auth); // Use 'user' instead of 'isAuthenticated'
   const dispatch = useDispatch();
 
   const headerStyle = {
@@ -65,18 +65,18 @@ const Header = () => {
     <header style={headerStyle}>
       <Link to="/" style={logoStyle}>SkillSwap</Link>
       <nav style={navStyle}>
-        <NavLink to="/browse" style={getNavLinkStyle}>Browse Skills</NavLink>
-        <NavLink to="/dashboard" style={getNavLinkStyle}>Dashboard</NavLink>
-        <NavLink to="/profile" style={getNavLinkStyle}>Profile</NavLink>
-        <NavLink to="/find-matches" style={getNavLinkStyle}>Your Matches</NavLink>
-        <NavLink to="/schedule" style={getNavLinkStyle}>Your Meets</NavLink>
+        {user && <NavLink to="/browse" style={getNavLinkStyle}>Browse Skills</NavLink>}
+        {user && <NavLink to="/dashboard" style={getNavLinkStyle}>Dashboard</NavLink>}
+        {user && <NavLink to="/profile" style={getNavLinkStyle}>Profile</NavLink>}
+        {user && <NavLink to="/find-matches" style={getNavLinkStyle}>Your Matches</NavLink>}
+        {user && <NavLink to="/schedule" style={getNavLinkStyle}>Your Meets</NavLink>}
         {/* You can add other public links like 'About Us' here */}
       </nav>
       <div>
-        {isAuthenticated ? (
+        {user ? ( // Check for 'user' instead of 'isAuthenticated'
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <button 
-             onClick={() => dispatch(logout())}
+             onClick={() => dispatch(setUser(null))} // Dispatch setUser(null) for logout
              style={{...buttonStyle, backgroundColor: '#f0eaff', color: '#6a5acd', marginLeft: '1rem'}}
             >
               Logout
