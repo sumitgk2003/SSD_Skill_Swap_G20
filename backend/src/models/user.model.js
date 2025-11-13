@@ -1,0 +1,70 @@
+import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcrypt";
+const userSchema = new mongoose.Schema(
+  {
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+    },
+    Name: {
+      type: String,
+      required: true,
+    },
+    learnSkill: {
+      type: Array,
+      default: [],
+      items: {
+        type: String,
+      },
+    },
+    teachSkill: {
+      type: Array,
+      default: [],
+      items: {
+        type: String,
+      },
+    },
+    password: {
+      type: String,
+      required: true,
+    },
+    refreshToken: {
+      type: String,
+    },
+  },
+  { timestamps: true }
+);
+
+studentSchema.methods.isPasswordCorrect = async function (password) {
+  return await bcrypt.compare(password, this.password);
+};
+
+studentSchema.methods.generateAccessToken = function () {
+  return jwt.sign(
+    {
+      _id: this._id,
+      email: this.email,
+    },
+    process.env.ACCESS_TOKEN_SECRET,
+    {
+      expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
+    }
+  );
+};
+
+studentSchema.methods.generateRefreshToken = function () {
+  return jwt.sign(
+    {
+      _id: this._id,
+    },
+    process.env.REFRESH_TOKEN_SECRET,
+    {
+      expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
+    }
+  );
+};
+
+export const User = mongoose.model("User", userSchema);
