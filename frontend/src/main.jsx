@@ -7,7 +7,6 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import authReducer from './store/authSlice';
 
-
 // Configure the Redux store
 const store = configureStore({
   reducer: {
