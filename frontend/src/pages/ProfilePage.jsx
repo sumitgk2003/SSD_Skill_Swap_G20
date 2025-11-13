@@ -1,6 +1,9 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const ProfilePage = () => {
+  const navigate = useNavigate();
+
   const pageStyle = {
     padding: '3rem',
     maxWidth: '900px',
@@ -80,7 +83,7 @@ const ProfilePage = () => {
         <div>
           <h1 style={nameStyle}>User Name</h1>
           <p style={bioStyle}>Passionate developer and mentor, eager to share knowledge about React and modern web technologies.</p>
-          <button style={buttonStyle}>Edit Profile</button>
+          <button style={buttonStyle} onClick={() => navigate('/create-profile')}>Edit Profile</button>
         </div>
       </div>
 
