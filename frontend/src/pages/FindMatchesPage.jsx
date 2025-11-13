@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-// import { MessageSquare, Send, X } from 'lucide-react'; // Removed this import to fix the error
+import React, { useState, useRef, useEffect } from 'react';
 
 // Mock data now includes messages and profile pictures
 const mockMatchesData = [
@@ -53,8 +52,7 @@ const mockMatchesData = [
 ];
 
 // --- ChatWindow Component ---
-// This component renders the active chat conversation
-const ChatWindow = ({ user, onClose, onSendMessage }) => {
+const ChatWindow = ({ user, onSendMessage, onOpenScheduler, confirmation }) => {
   const [newMessage, setNewMessage] = useState('');
 
   const handleSubmit = (e) => {
@@ -68,8 +66,7 @@ const ChatWindow = ({ user, onClose, onSendMessage }) => {
   if (!user) {
     return (
       <div style={styles.chatPlaceholder}>
-        {/* Replaced Lucide icon with an emoji */}
-        <span style={{ fontSize: '64px', color: '#ccc' }}>✉️</span>
+        <span style={{ fontSize: 64, color: '#ccc' }}>✉️</span>
         <h2 style={{ color: '#777', fontWeight: 500 }}>Select a match to start messaging</h2>
       </div>
     );
@@ -79,13 +76,32 @@ const ChatWindow = ({ user, onClose, onSendMessage }) => {
     <div style={styles.chatWindow}>
       {/* Chat Header */}
       <header style={styles.chatHeader}>
-        <img src={user.pic} alt={user.name} style={styles.chatHeaderPic} />
-        <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#333' }}>{user.name}</h2>
-        <button onClick={onClose} style={styles.closeButton}>
-          {/* Replaced Lucide icon with an emoji */}
-          <span style={{ fontSize: '16px', lineHeight: '1' }}>❌</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <img src={user.pic} alt={user.name} style={styles.chatHeaderPic} />
+          <div>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#333', margin: 0 }}>{user.name}</h2>
+            <div style={{ fontSize: 13, color: '#666' }}>{user.teaches} • wants {user.learns}</div>
+          </div>
+        </div>
+
+        {/* Right side control: schedule button */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button
+            onClick={onOpenScheduler}
+            title="Schedule Meet"
+            style={styles.scheduleTextButton}
+          >
+            Schedule Meet
+          </button>
+        </div>
       </header>
+
+      {/* optional small confirmation (toast-like, below header) */}
+      {confirmation && (
+        <div style={styles.inlineConfirm}>
+          {confirmation}
+        </div>
+      )}
 
       {/* Messages Area */}
       <div style={styles.messagesArea}>
@@ -111,8 +127,7 @@ const ChatWindow = ({ user, onClose, onSendMessage }) => {
           onChange={(e) => setNewMessage(e.target.value)}
         />
         <button type="submit" style={styles.sendButton}>
-          {/* Replaced Lucide icon with an emoji */}
-          <span style={{ fontSize: '20px', lineHeight: '1' }}>➡️</span>
+          <span style={{ fontSize: 20, lineHeight: 1 }}>➡️</span>
         </button>
       </form>
     </div>
@@ -120,49 +135,128 @@ const ChatWindow = ({ user, onClose, onSendMessage }) => {
 };
 
 // --- FindMatchesPage Component ---
-// This is the main page component
 const FindMatchesPage = () => {
   const [matches, setMatches] = useState(mockMatchesData);
   const [selectedUser, setSelectedUser] = useState(null);
+
+  // scheduler modal state
+  const [schedulerOpen, setSchedulerOpen] = useState(false);
+  const [meetType, setMeetType] = useState('online');
+  const [date, setDate] = useState(new Date().toISOString().slice(0,10));
+  const [time, setTime] = useState('09:00');
+  const [note, setNote] = useState('');
+  const [errors, setErrors] = useState({});
+  const [confirmation, setConfirmation] = useState('');
+
+  const firstFieldRef = useRef(null);
+  const dateInputRef = useRef(null);
+  const timeInputRef = useRef(null);
+
+  // inject Inter font once
+  useEffect(() => {
+    const id = 'inter-font-link';
+    if (!document.getElementById(id)) {
+      const link = document.createElement('link');
+      link.id = id;
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap';
+      document.head.appendChild(link);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (schedulerOpen && firstFieldRef.current) firstFieldRef.current.focus();
+    const onKey = (e) => { if (e.key === 'Escape') setSchedulerOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [schedulerOpen]);
 
   const handleSelectUser = (user) => {
     setSelectedUser(user);
   };
 
-  const handleCloseChat = () => {
-    setSelectedUser(null);
-  };
-
   const handleSendMessage = (userId, text) => {
     const newMessage = {
-      id: Date.now(), // simple unique id
+      id: Date.now(),
       sender: 'You',
       text: text,
     };
 
-    // Update the messages for the specific user
     const updatedMatches = matches.map(user => {
       if (user.id === userId) {
-        return {
-          ...user,
-          messages: [...user.messages, newMessage],
-        };
+        return { ...user, messages: [...user.messages, newMessage] };
       }
       return user;
     });
 
     setMatches(updatedMatches);
 
-    // Update the selectedUser state as well to re-render the chat window
     if (selectedUser && selectedUser.id === userId) {
-      setSelectedUser(prevUser => ({
-        ...prevUser,
-        messages: [...prevUser.messages, newMessage],
-      }));
+      setSelectedUser(prev => ({ ...prev, messages: [...prev.messages, newMessage] }));
     }
   };
 
-  const selectedChatUser = matches.find(user => user.id === selectedUser?.id) || null;
+  // scheduler helpers
+  const openScheduler = () => {
+    setErrors({});
+    // prefill with next available defaults
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 30);
+    setDate(now.toISOString().slice(0,10));
+    setTime(now.toTimeString().slice(0,5));
+    setMeetType('online');
+    setNote(selectedUser ? `Meeting with ${selectedUser.name}` : '');
+    setSchedulerOpen(true);
+  };
+  const closeScheduler = () => setSchedulerOpen(false);
+
+  const validate = () => {
+    const e = {};
+    if (!date) e.date = 'Please pick a date.';
+    if (!time) e.time = 'Please pick a time.';
+    const dt = new Date(`${date}T${time}:00`);
+    if (isNaN(dt.getTime())) e.date = 'Invalid date/time.';
+    if (dt.getTime() < Date.now() - 1000) e.time = 'Meeting time must be in the future.';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  // reliably open native pickers
+  const openDatePicker = () => {
+    const el = dateInputRef.current;
+    if (!el) return;
+    setTimeout(() => {
+      try { if (typeof el.showPicker === 'function') el.showPicker(); else el.click(); }
+      catch { try { el.click(); } catch { el.focus(); } }
+    }, 0);
+  };
+  const openTimePicker = () => {
+    const el = timeInputRef.current;
+    if (!el) return;
+    setTimeout(() => {
+      try { if (typeof el.showPicker === 'function') el.showPicker(); else el.click(); }
+      catch { try { el.click(); } catch { el.focus(); } }
+    }, 0);
+  };
+
+  // create meeting action (stub - you can call backend here)
+  const createMeeting = (e) => {
+    e.preventDefault();
+    if (!validate()) return;
+    const payload = {
+      type: meetType,
+      date,
+      time,
+      note,
+      with: selectedUser ? { id: selectedUser.id, name: selectedUser.name } : null,
+    };
+    console.log('Create meeting payload:', payload);
+    setConfirmation(`Meeting scheduled ${meetType} ${date} ${time}${selectedUser ? ' with ' + selectedUser.name : ''}.`);
+    setTimeout(() => setConfirmation(''), 5000);
+    setSchedulerOpen(false);
+  };
+
+  const selectedChatUser = matches.find(u => u.id === selectedUser?.id) || null;
 
   return (
     <div style={styles.page}>
@@ -186,10 +280,13 @@ const FindMatchesPage = () => {
                   <strong>Learns:</strong> {match.learns}
                 </p>
               </div>
-              <button style={styles.messageButton} onClick={() => handleSelectUser(match)}>
-                {/* Replaced Lucide icon with an emoji */}
+              <button 
+                style={styles.messageButton} 
+                onClick={(ev) => { ev.stopPropagation(); handleSelectUser(match); }}
+                aria-label={`Message ${match.name}`}
+              >
                 <span>✉️</span>
-                <span>Message</span>
+                <span style={{ marginLeft: 6 }}>Message</span>
               </button>
             </div>
           ))}
@@ -200,25 +297,108 @@ const FindMatchesPage = () => {
       <div style={styles.chatContainer}>
         <ChatWindow 
           user={selectedChatUser} 
-          onClose={handleCloseChat}
           onSendMessage={handleSendMessage}
+          onOpenScheduler={openScheduler}
+          confirmation={confirmation}
         />
       </div>
+
+      {/* Scheduler Modal */}
+      {schedulerOpen && (
+        <div style={styles.modalOverlay} onClick={(e) => e.target === e.currentTarget && closeScheduler()}>
+          <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+            <form onSubmit={createMeeting}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Schedule meeting</h3>
+                <button type="button" onClick={closeScheduler} style={styles.closeBtnModal} aria-label="Close form">✕</button>
+              </div>
+
+              <div style={{ marginTop: 8 }}>
+                <div style={styles.label}>Meeting type</div>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <label style={styles.radioLabel}>
+                    <input ref={firstFieldRef} type="radio" name="type" value="online" checked={meetType === 'online'} onChange={() => setMeetType('online')} />
+                    <span style={{ marginLeft: 6 }}>Online</span>
+                  </label>
+                  <label style={styles.radioLabel}>
+                    <input type="radio" name="type" value="inperson" checked={meetType === 'inperson'} onChange={() => setMeetType('inperson')} />
+                    <span style={{ marginLeft: 6 }}>In person</span>
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 12, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 180px', minWidth: 140 }}>
+                  <div style={styles.label}>Date</div>
+                  <div style={{ ...styles.clickableField, position: 'relative' }} onClick={openDatePicker}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 15, color: '#222' }}>{date}</div>
+                      <div style={{ fontSize: 13, color: '#888' }}>Tap to change</div>
+                    </div>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden style={{ opacity: 0.7 }}>
+                      <rect x="3" y="4" width="18" height="18" rx="2" stroke="#dcd7ff" strokeWidth="1.2" fill="none"></rect>
+                    </svg>
+                    <input
+                      ref={dateInputRef}
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                    />
+                  </div>
+                  {errors.date && <div style={styles.errorStyle}>{errors.date}</div>}
+                </div>
+
+                <div style={{ flex: '1 1 140px', minWidth: 120 }}>
+                  <div style={styles.label}>Time</div>
+                  <div style={{ ...styles.clickableField, position: 'relative' }} onClick={openTimePicker}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 15, color: '#222' }}>{time}</div>
+                      <div style={{ fontSize: 13, color: '#888' }}>Tap to change</div>
+                    </div>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden style={{ opacity: 0.7 }}>
+                      <circle cx="12" cy="12" r="9" stroke="#dcd7ff" strokeWidth="1.2" fill="none"></circle>
+                      <path d="M12 7v6l4 2" stroke="#6a5acd" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>
+                    </svg>
+                    <input
+                      ref={timeInputRef}
+                      type="time"
+                      value={time}
+                      onChange={(e) => setTime(e.target.value)}
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                    />
+                  </div>
+                  {errors.time && <div style={styles.errorStyle}>{errors.time}</div>}
+                </div>
+              </div>
+
+              <div style={{ marginTop: 12 }}>
+                <div style={styles.label}>Title / Note (optional)</div>
+                <input style={styles.inputBase} type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Coffee & code review" />
+              </div>
+
+              <div style={{ marginTop: 16, display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={closeScheduler} style={styles.cancelBtn}>Cancel</button>
+                <button type="submit" style={styles.createBtn}>Create meeting</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 // --- Styles ---
-// Keeping styles in the same file for simplicity
 const styles = {
   page: {
     display: 'flex',
-    height: 'calc(100vh - 80px)', // Assuming a header height of 80px
-    fontFamily: '"Inter", sans-serif',
+    height: 'calc(100vh - 60px)', // adjust if your header is different
+    fontFamily: '"Inter", system-ui, Arial, -apple-system, "Segoe UI", Roboto',
     backgroundColor: '#f7f7f7',
   },
   matchListContainer: {
-    width: '400px',
+    width: 400,
     borderRight: '1px solid #e0e0e0',
     display: 'flex',
     flexDirection: 'column',
@@ -226,7 +406,7 @@ const styles = {
   },
   header: {
     fontSize: '1.8rem',
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#333',
     padding: '1.5rem',
     borderBottom: '1px solid #eee',
@@ -255,8 +435,8 @@ const styles = {
     borderRight: '4px solid #6a5acd',
   },
   matchPic: {
-    width: '50px',
-    height: '50px',
+    width: 50,
+    height: 50,
     borderRadius: '50%',
     objectFit: 'cover',
   },
@@ -265,11 +445,11 @@ const styles = {
   },
   name: {
     fontSize: '1.1rem',
-    fontWeight: 'bold',
+    fontWeight: '700',
     margin: '0 0 0.25rem 0',
   },
   skillLine: {
-    fontSize: '0.85rem',
+    fontSize: '0.9rem',
     color: '#555',
     margin: 0,
     lineHeight: 1.4,
@@ -280,11 +460,11 @@ const styles = {
     gap: '0.5rem',
     padding: '0.5rem 0.8rem',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: 8,
     backgroundColor: '#6a5acd',
     color: 'white',
-    fontWeight: 'bold',
-    fontSize: '0.9rem',
+    fontWeight: 700,
+    fontSize: '0.95rem',
     cursor: 'pointer',
     transition: 'background-color 0.2s',
   },
@@ -292,6 +472,7 @@ const styles = {
     flexGrow: 1,
     display: 'flex',
     flexDirection: 'column',
+    backgroundColor: '#f7f7f7',
   },
   chatPlaceholder: {
     flexGrow: 1,
@@ -306,37 +487,49 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
+    backgroundColor: '#fff',
   },
   chatHeader: {
     display: 'flex',
     alignItems: 'center',
     gap: '1rem',
-    padding: '1rem 1.5rem',
+    padding: '0.9rem 1rem',
     backgroundColor: '#fff',
     borderBottom: '1px solid #eee',
   },
   chatHeaderPic: {
-    width: '40px',
-    height: '40px',
+    width: 40,
+    height: 40,
     borderRadius: '50%',
     objectFit: 'cover',
   },
-  closeButton: {
-    marginLeft: 'auto',
-    background: 'none',
+  // replaced circular calendar with text button in top-right:
+  scheduleTextButton: {
+    padding: '0.45rem 0.9rem',
+    borderRadius: 8,
     border: 'none',
+    backgroundColor: '#eae6ff',
+    color: '#2e1e9f',
+    fontWeight: 700,
     cursor: 'pointer',
-    padding: '0.5rem',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    lineHeight: 1, // Added for better emoji alignment
+    boxShadow: '0 6px 18px rgba(106,90,205,0.08)',
+    fontSize: 14,
   },
+  inlineConfirm: {
+    padding: '0.5rem 1rem',
+    background: '#eaf9ef',
+    color: '#107a3a',
+    fontWeight: 700,
+    margin: '0.5rem 1rem',
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  // make messages area larger and add bottom padding
   messagesArea: {
     flexGrow: 1,
     overflowY: 'auto',
     padding: '1.5rem',
+    paddingBottom: '5.5rem', // increased bottom padding so last messages are visible above input
     backgroundColor: '#f7f7f7',
     display: 'flex',
     flexDirection: 'column',
@@ -346,39 +539,41 @@ const styles = {
     alignSelf: 'flex-end',
     backgroundColor: '#6a5acd',
     color: 'white',
-    padding: '0.8rem 1rem',
+    padding: '0.9rem 1.1rem', // slightly larger
     borderRadius: '20px 20px 4px 20px',
-    maxWidth: '70%',
-    lineHeight: 1.4,
+    maxWidth: '72%',
+    lineHeight: 1.45,
+    fontSize: 15,
   },
   messageReceived: {
     alignSelf: 'flex-start',
     backgroundColor: '#fff',
     color: '#333',
-    padding: '0.8rem 1rem',
+    padding: '0.9rem 1.1rem', // slightly larger
     borderRadius: '20px 20px 20px 4px',
-    maxWidth: '70%',
-    lineHeight: 1.4,
+    maxWidth: '72%',
+    lineHeight: 1.45,
     border: '1px solid #eee',
+    fontSize: 15,
   },
   noMessages: {
     textAlign: 'center',
     color: '#888',
     marginTop: '2rem',
-    fontSize: '0.9rem',
+    fontSize: '0.95rem',
   },
   messageInputForm: {
     display: 'flex',
-    padding: '1rem 1.5rem',
+    padding: '1rem',
     borderTop: '1px solid #eee',
     backgroundColor: '#fff',
   },
   messageInput: {
     flexGrow: 1,
     border: '1px solid #ddd',
-    borderRadius: '20px',
-    padding: '0.8rem 1.2rem',
-    fontSize: '1rem',
+    borderRadius: 20,
+    padding: '0.9rem 1.2rem',
+    fontSize: '1.05rem', // slightly larger input
     outline: 'none',
   },
   sendButton: {
@@ -386,15 +581,75 @@ const styles = {
     border: 'none',
     backgroundColor: '#6a5acd',
     color: 'white',
-    width: '45px',
-    height: '45px',
+    width: 48,
+    height: 48,
     borderRadius: '50%',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    lineHeight: 1, // Added for better emoji alignment
+    lineHeight: 1,
   },
+
+  /* modal styles */
+  modalOverlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(16,16,20,0.45)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 60,
+    padding: '1rem',
+    boxSizing: 'border-box',
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 640,
+    background: '#fff',
+    borderRadius: 12,
+    padding: '1.4rem 1.4rem',
+    boxShadow: '0 14px 50px rgba(2,6,23,0.18)',
+    boxSizing: 'border-box',
+  },
+  closeBtnModal: {
+    background: '#f6f6fb',
+    border: '1px solid rgba(34,34,34,0.06)',
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    color: '#444',
+    fontSize: 16,
+    lineHeight: 1,
+  },
+  label: { fontSize: 15, color: '#333', fontWeight: 700, marginBottom: 8 },
+  inputBase: {
+    padding: '0.75rem 0.85rem',
+    borderRadius: 10,
+    border: '1px solid #e6e0ff',
+    fontSize: 15,
+    width: '100%',
+    boxSizing: 'border-box',
+    background: 'white',
+  },
+  clickableField: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    padding: '0.6rem 0.75rem',
+    borderRadius: 10,
+    border: '1px solid #e9e6fb',
+    background: '#fbfbff',
+    cursor: 'pointer',
+  },
+  radioLabel: { display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 15 },
+  errorStyle: { color: '#d23', marginTop: 6, fontSize: 13 },
+  cancelBtn: { padding: '0.7rem 1rem', borderRadius: 8, border: '1px solid #e6e6ea', background: '#fff', cursor: 'pointer', fontSize: 15 },
+  createBtn: { padding: '0.7rem 1.05rem', borderRadius: 8, border: 'none', background: '#6a5acd', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 15 },
 };
 
 export default FindMatchesPage;
