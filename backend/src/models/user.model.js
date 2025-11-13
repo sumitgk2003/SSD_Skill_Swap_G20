@@ -38,11 +38,11 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-studentSchema.methods.isPasswordCorrect = async function (password) {
+userSchema.methods.isPasswordCorrect = async function (password) {
   return await bcrypt.compare(password, this.password);
 };
 
-studentSchema.methods.generateAccessToken = function () {
+userSchema.methods.generateAccessToken = function () {
   return jwt.sign(
     {
       _id: this._id,
@@ -55,7 +55,7 @@ studentSchema.methods.generateAccessToken = function () {
   );
 };
 
-studentSchema.methods.generateRefreshToken = function () {
+userSchema.methods.generateRefreshToken = function () {
   return jwt.sign(
     {
       _id: this._id,

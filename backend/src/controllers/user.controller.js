@@ -112,8 +112,8 @@ const loginUser = asyncHandler(async (req, res) => {
     );
 });
 
-const logoutStudent = asyncHandler(async (req, res) => {
-  await Student.findByIdAndUpdate(
+const logoutUser = asyncHandler(async (req, res) => {
+  await User.findByIdAndUpdate(
     req.user._id,
     {
       $set: {
@@ -128,7 +128,7 @@ const logoutStudent = asyncHandler(async (req, res) => {
     .status(200)
     .clearCookie("accessToken", options)
     .clearCookie("refreshToken", options)
-    .json(new ApiResponse(200, {}, "Student logged Out Successfully"));
+    .json(new ApiResponse(200, {}, "User logged Out Successfully"));
 });
 
 const createQuery = asyncHandler(async (req, res) => {
@@ -259,9 +259,9 @@ const joinClass = asyncHandler(async (req, res) => {
 });
 
 export {
-  registerStudent,
-  loginStudent,
-  logoutStudent,
+  registerUser,
+  loginUser,
+  logoutUser,
   createQuery,
   getCreatedQueries,
   getAllActiveClasses,
