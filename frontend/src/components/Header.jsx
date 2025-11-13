@@ -69,6 +69,7 @@ const Header = () => {
         <NavLink to="/dashboard" style={getNavLinkStyle}>Dashboard</NavLink>
         <NavLink to="/profile" style={getNavLinkStyle}>Profile</NavLink>
         <NavLink to="/find-matches" style={getNavLinkStyle}>Find Matches</NavLink>
+        <NavLink to="/find-matches" style={getNavLinkStyle}>Find Matches</NavLink>
         {/* You can add other public links like 'About Us' here */}
       </nav>
       <div>

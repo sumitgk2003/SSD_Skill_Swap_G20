@@ -9,7 +9,7 @@ import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
 import CreateProfilePage from './pages/CreateProfilePage';
-import FindMatchesPage from './pages/FindMatchesPage';
+import FindMatchesPage from './pages/FindMatchesPage2';
 import MeetScheduler from './pages/MeetScheduler';
 
 // This component provides a consistent layout with a header for all pages.
