@@ -2,16 +2,46 @@
 import React from 'react';
 import { useDispatch } from 'react-redux';
 import { Link } from 'react-router-dom';
-import { setUser } from '../store/authSlice'; // Import setUser action
-
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import { setSkills, setInterests,setUser } from '../store/authSlice';
 const SignUpPage = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   
-  const handleSignUp = (e) => {
-    e.preventDefault(); // Prevents the form from reloading the page
-    // In a real app, you'd send user data to your backend here
-    // Simulate login after successful signup
-    dispatch(setUser({ name: 'Test User', email: 'test@example.com' })); 
+  const handleSignUp = async(e) => {
+    e.preventDefault(); 
+    try {
+      console.log(e.target[0].value, e.target[1].value, e.target[2].value);
+      const res = await axios.post(
+        `http://localhost:8000/api/v1/users/register`,
+        {
+          name: e.target[0].value,
+          email: e.target[1].value,
+          password: e.target[2].value,
+        },
+        {
+          withCredentials: true,
+        }
+      );
+      if (res.data.success) {
+        dispatch(setUser(res.data.data.user));
+        console.log("Login successful:", res);
+        navigate("/dashboard");
+        //toast.success(res.data.message);
+      }
+    } catch (error) {
+      console.error("Error during login:", error);
+      //toast.error(
+        //error.response?.data?.message || "Login failed. Please try again."
+      //);
+    } finally {
+      //dispatch(setLoading(false));
+    }
+    //dispatch(setUser({ name: 'Logged In User'}));
+    dispatch(setSkills(['JavaScript', 'React', 'Node.js']));
+    dispatch(setInterests(['Web Development', 'Open Source']));
+    navigate('/dashboard'); // Redirect to dashboard after login 
   };
 
   const pageStyle = {

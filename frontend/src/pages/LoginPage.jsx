@@ -3,18 +3,47 @@ import React from 'react';
 import { useDispatch } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
 import { setSkills, setUser,setInterests } from '../store/authSlice'; // Import setUser action
+import axios from 'axios';
 
 const LoginPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate(); // Initialize useNavigate
   
-  const handleLogin = (e) => {
-    e.preventDefault(); // Prevents the form from reloading the page
-    // In a real app, you would verify credentials here
-    dispatch(setUser({ name: 'Logged In User'}));
-    dispatch(setSkills(['JavaScript', 'React', 'Node.js']));
-    dispatch(setInterests(['Web Development', 'Open Source']));
-    navigate('/dashboard'); // Redirect to dashboard after login
+  const handleLogin = async (e) => {
+    e.preventDefault(); 
+    try {
+      console.log(e.target[0].value, e.target[1].value);
+      const res = await axios.post(
+        `http://localhost:8000/api/v1/users/login`,
+        {
+          email: e.target[0].value,
+          password: e.target[1].value,
+        },
+        {
+          withCredentials: true,
+        }
+      );
+      if (res.data.success) {
+        const user = {
+          name: res.data.data.user.name,
+          email: res.data.data.user.email,
+          id: res.data.data.user._id,
+        };
+        dispatch(setUser(user));
+        dispatch(setSkills(res.data.data.user.teachSkill || []));
+        dispatch(setInterests(res.data.data.user.learnSkill || []));
+        console.log("Login successful:", res);
+        navigate("/dashboard");
+        //toast.success(res.data.message);
+      }
+    } catch (error) {
+      console.error("Error during login:", error);
+      //toast.error(
+        //error.response?.data?.message || "Login failed. Please try again."
+      //);
+    } finally {
+      //dispatch(setLoading(false));
+    }
   };
 
   const pageStyle = {
