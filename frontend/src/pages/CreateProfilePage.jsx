@@ -12,6 +12,7 @@ const CreateProfilePage = () => {
   const [learningSkillInput, setLearningSkillInput] = useState('');
   const [currentTeachingSkills, setCurrentTeachingSkills] = useState([]);
   const [currentLearningSkills, setCurrentLearningSkills] = useState([]);
+  const [showSaveMessage, setShowSaveMessage] = useState(false); // New state for save message
 
   useEffect(() => {
     setCurrentTeachingSkills(userSkills);
@@ -53,7 +54,11 @@ const CreateProfilePage = () => {
     console.log('CreateProfilePage: Dispatching setInterests with:', currentLearningSkills);
     dispatch(setInterests(currentLearningSkills));
     // In a real application, you would also send this data to a backend API
-    alert('Profile Saved!');
+    
+    setShowSaveMessage(true); // Show the message
+    setTimeout(() => {
+      setShowSaveMessage(false); // Hide the message after 3 seconds
+    }, 3000);
   };
 
   const pageStyle = { padding: '3rem', maxWidth: '800px', margin: '2rem auto' };
@@ -65,6 +70,13 @@ const CreateProfilePage = () => {
   const skillTagContainerStyle = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', minHeight: '40px' };
   const skillTagStyle = { display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#f0eaff', color: '#6a5acd', padding: '0.5rem 1rem', borderRadius: '20px', fontWeight: 500 };
   const removeBtnStyle = { cursor: 'pointer', border: 'none', backgroundColor: 'transparent', color: '#6a5acd', fontWeight: 'bold', fontSize: '1rem' };
+  const saveMessageStyle = {
+    textAlign: 'center',
+    color: '#4CAF50', // Green color for success
+    fontSize: '1.1rem',
+    marginBottom: '1rem',
+    fontWeight: 'bold',
+  };
 
   return (
     <div style={pageStyle}>
@@ -117,6 +129,7 @@ const CreateProfilePage = () => {
         </div>
         
         <div style={{textAlign: 'center', marginTop: '3rem'}}>
+            {showSaveMessage && <p style={saveMessageStyle}>Profile Saved!</p>}
             <button onClick={handleSaveProfile} style={{...buttonStyle, padding: '0.8rem 3rem', fontSize: '1.1rem'}}>Save Profile</button>
         </div>
       </div>
