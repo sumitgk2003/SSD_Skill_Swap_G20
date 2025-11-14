@@ -2,7 +2,7 @@
 import React from 'react';
 import { useDispatch } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
-import { setUser } from '../store/authSlice'; // Import setUser action
+import { setSkills, setUser,setInterests } from '../store/authSlice'; // Import setUser action
 
 const LoginPage = () => {
   const dispatch = useDispatch();
@@ -12,6 +12,8 @@ const LoginPage = () => {
     e.preventDefault(); // Prevents the form from reloading the page
     // In a real app, you would verify credentials here
     dispatch(setUser({ name: 'Logged In User'}));
+    dispatch(setSkills(['JavaScript', 'React', 'Node.js']));
+    dispatch(setInterests(['Web Development', 'Open Source']));
     navigate('/dashboard'); // Redirect to dashboard after login
   };
 
