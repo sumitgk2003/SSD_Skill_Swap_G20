@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { Routes, Route, Outlet } from 'react-router-dom';
 import Header from './components/Header';
 import HomePage from './pages/HomePage';
@@ -11,6 +12,10 @@ import ProtectedRoute from './components/ProtectedRoute';
 import CreateProfilePage from './pages/CreateProfilePage';
 import FindMatchesPage from './pages/FindMatchesPage';
 import MeetsListPage from './pages/MeetScheduler';
+import './index.css';
+import './App.css';
+
+
 import AdminPage from './pages/AdminPage';
 import AdminLoginPage from './pages/AdminLoginPage';
 import AdminUsersPage from './pages/AdminUsersPage';
@@ -19,16 +24,15 @@ import AdminDisputesPage from './pages/AdminDisputesPage';
 import AdminPolicyPage from './pages/AdminPolicyPage';
 // This component provides a consistent layout with a header for all pages.
 const AppLayout = () => {
-  const containerStyle = {
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-    color: '#333',
-    minHeight: '100vh',
-    display: 'flex',
-    flexDirection: 'column',
-    backgroundColor: '#f8f7ff', // A light, consistent background for the app
-  };
+  const theme = useSelector((state) => state.theme.theme);
+
+  // Apply theme to the root element for global scope
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+  
   return (
-    <div style={containerStyle}>
+    <div>
       <Header />
       <main style={{flexGrow: 1}}>
         <Outlet /> {/* Child routes will render here */}

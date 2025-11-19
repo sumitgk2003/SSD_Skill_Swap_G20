@@ -52,44 +52,69 @@ const LoginPage = () => {
     justifyContent: 'center',
     alignItems: 'center',
     padding: '4rem 2rem',
+    minHeight: 'calc(100vh - 120px)',
+    backgroundColor: 'var(--background-secondary)',
   };
 
   const formContainerStyle = {
-    backgroundColor: 'white',
+    backgroundColor: 'var(--background-primary)',
     padding: '2.5rem',
-    borderRadius: '12px',
-    boxShadow: '0 8px 30px rgba(0,0,0,0.1)',
+    borderRadius: '16px',
+    boxShadow: 'var(--card-shadow)',
+    border: '1px solid var(--border-color)',
     width: '100%',
-    maxWidth: '400px',
+    maxWidth: '420px',
     textAlign: 'center',
+    transition: 'background-color 0.3s ease, border-color 0.3s ease',
+  };
+
+  const titleStyle = {
+    color: 'var(--text-primary)',
+    marginBottom: '2rem',
+    fontWeight: 'bold',
   };
 
   const inputStyle = {
     width: '100%',
-    padding: '0.8rem',
-    border: '1px solid #ccc',
+    padding: '1rem',
+    border: '1px solid var(--border-color)',
     borderRadius: '8px',
     marginBottom: '1rem',
     boxSizing: 'border-box',
     fontSize: '1rem',
+    backgroundColor: 'var(--background-secondary)',
+    color: 'var(--text-primary)',
+    outline: 'none',
+    transition: 'border-color 0.2s ease, background-color 0.3s ease',
   };
 
   const buttonStyle = {
     width: '100%',
-    padding: '0.8rem',
+    padding: '1rem',
     border: 'none',
     borderRadius: '8px',
-    backgroundColor: '#6a5acd',
+    backgroundColor: 'var(--accent-primary)',
     color: 'white',
     fontWeight: 'bold',
     fontSize: '1.1rem',
     cursor: 'pointer',
+    transition: 'background-color 0.3s ease',
+  };
+
+  const bottomTextStyle = {
+    marginTop: '1.5rem',
+    color: 'var(--text-secondary)',
+  };
+
+  const linkStyle = {
+    color: 'var(--accent-primary)',
+    fontWeight: 'bold',
   };
 
   return (
     <div style={pageStyle}>
       <div style={formContainerStyle}>
-        <h2 style={{ marginBottom: '2rem' }}>Welcome Back!</h2>
+        <h2 style={titleStyle}>Welcome Back!</h2>
         <form onSubmit={handleLogin}>
           <input type="email" placeholder="Email Address" style={inputStyle} required />
           <input type="password" placeholder="Password" style={inputStyle} required />
@@ -97,8 +122,8 @@ const LoginPage = () => {
             Log In
           </button>
         </form>
-        <p style={{ marginTop: '1.5rem', color: '#555' }}>
-          Don't have an account? <Link to="/signup" style={{ color: '#6a5acd', fontWeight: 'bold' }}>Sign Up</Link>
+        <p style={bottomTextStyle}>
+          Don't have an account? <Link to="/signup" style={linkStyle}>Sign Up</Link>
         </p>
       </div>
     </div>
