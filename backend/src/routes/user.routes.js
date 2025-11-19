@@ -1,5 +1,8 @@
 import {Router} from "express";
-import {registerUser,loginUser,logoutUser,updateProfile,findMatches} from "../controllers/user.controller.js";
+import {registerUser,loginUser,logoutUser,updateProfile,
+findMatches,sendRequest,getPendingRequests,getConnectedUsers,
+respondRequest
+} from "../controllers/user.controller.js";
 
 import {verifyJWT} from "../middlewares/auth.middleware.js";
 
@@ -13,4 +16,10 @@ router.route("/login").post(loginUser);
 router.route("/logout").post(verifyJWT,logoutUser);
 router.route("/updateProfile").post(verifyJWT,updateProfile);
 router.route("/getMatches").post(verifyJWT, findMatches);
+
+router.route("/sendRequest").post(verifyJWT, sendRequest);
+router.route("/viewRequests").get(verifyJWT, getPendingRequests);
+router.route("/respondRequest").post(verifyJWT, respondRequest);
+router.route("/getConnected").get(verifyJWT, getConnectedUsers);
+
 export default router;
