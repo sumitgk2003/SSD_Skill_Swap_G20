@@ -93,6 +93,10 @@ const Header = () => {
         {user && <NavLink to="/profile" style={getNavLinkStyle}>Profile</NavLink>}
         {user && <NavLink to="/find-matches" style={getNavLinkStyle}>Your Matches</NavLink>}
         {user && <NavLink to="/schedule" style={getNavLinkStyle}>Your Meets</NavLink>}
+        {user && user.isAdmin && <NavLink to="/admin/users" style={getNavLinkStyle}>Admin Users</NavLink>}
+        {user && user.isAdmin && <NavLink to="/admin/skills" style={getNavLinkStyle}>Admin Skills</NavLink>}
+        {user && user.isAdmin && <NavLink to="/admin/disputes" style={getNavLinkStyle}>Admin Disputes</NavLink>}
+        {user && user.isAdmin && <NavLink to="/admin/policy" style={getNavLinkStyle}>Admin Policy</NavLink>}
         {/* You can add other public links like 'About Us' here */}
       </nav>
       <div>

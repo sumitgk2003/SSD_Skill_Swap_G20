@@ -11,6 +11,12 @@ import ProtectedRoute from './components/ProtectedRoute';
 import CreateProfilePage from './pages/CreateProfilePage';
 import FindMatchesPage from './pages/FindMatchesPage';
 import MeetsListPage from './pages/MeetScheduler';
+import AdminPage from './pages/AdminPage';
+import AdminLoginPage from './pages/AdminLoginPage';
+import AdminUsersPage from './pages/AdminUsersPage';
+import AdminSkillsPage from './pages/AdminSkillsPage';
+import AdminDisputesPage from './pages/AdminDisputesPage';
+import AdminPolicyPage from './pages/AdminPolicyPage';
 // This component provides a consistent layout with a header for all pages.
 const AppLayout = () => {
   const containerStyle = {
@@ -42,6 +48,12 @@ const App = () => {
         <Route path="login" element={<LoginPage />} />
         <Route path="signup" element={<SignUpPage />} />
         <Route path="schedule" element={<MeetsListPage/>} />
+        <Route path="admin" element={<AdminLoginPage />} />
+        <Route path="admin/dashboard" element={<AdminPage />} />
+        <Route path="admin/users" element={<AdminUsersPage />} />
+        <Route path="admin/skills" element={<AdminSkillsPage />} />
+        <Route path="admin/disputes" element={<AdminDisputesPage />} />
+        <Route path="admin/policy" element={<AdminPolicyPage />} />
 
         {/* Protected Routes - only accessible when logged in */}
         <Route element={<ProtectedRoute />}>
