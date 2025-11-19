@@ -7,7 +7,7 @@ const ProfilePage = () => {
   const userBio = useSelector((state) => state.auth.bio); // Get bio from Redux
   const userSkills = useSelector((state) => state.auth.skills); // Get skills from Redux
   const userInterests = useSelector((state) => state.auth.interests); // Get interests from Redux
-
+  const user = useSelector((state) => state.auth.user); // Get user info from Redux
   const pageStyle = {
     padding: '3rem',
     maxWidth: '900px',
@@ -85,7 +85,7 @@ const ProfilePage = () => {
       <div style={topSectionStyle}>
         <div style={avatarStyle}>U</div>
         <div>
-          <h1 style={nameStyle}>User Name</h1>
+          <h1 style={nameStyle}>{user?.name || "User Name"}</h1>
           <p style={bioStyle}>{userBio||`Tell everyone a little about yourself...`}</p>
           <button style={buttonStyle} onClick={() => navigate('/create-profile')}>Edit Profile</button>
         </div>
