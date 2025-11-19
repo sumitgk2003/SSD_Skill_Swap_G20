@@ -1,12 +1,13 @@
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { NavLink, Link } from 'react-router-dom';
-import { setUser } from '../store/authSlice'; // Import setUser action
-
+import { setUser, setBio, setSkills, setInterests } from '../store/authSlice'; // Import setUser action
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 const Header = () => {
   const { user } = useSelector((state) => state.auth); // Use 'user' instead of 'isAuthenticated'
   const dispatch = useDispatch();
-
+  const navigate = useNavigate();
   const headerStyle = {
     display: 'flex',
     justifyContent: 'space-between',
@@ -61,6 +62,28 @@ const Header = () => {
   const getNavLinkStyle = ({ isActive }) => 
     isActive ? { ...navLinkStyle, ...activeNavLinkStyle } : navLinkStyle;
 
+  const handleLogout = async() => {
+    try {
+      const res = await axios.post(
+        `http://localhost:8000/api/v1/users/logout`,
+        {},
+        {
+          withCredentials: true,
+        }
+      );
+      if (res.data.success) {
+        console.log("Logout successful:", res);
+        dispatch(setUser(null));
+        dispatch(setBio(""));
+        dispatch(setSkills([]));
+        dispatch(setInterests([]));
+        navigate("/login");
+      }
+    } catch (error) {
+      console.error("Error during logout:", error);
+    }
+  };
+
   return (
     <header style={headerStyle}>
       <Link to="/" style={logoStyle}>SkillSwap</Link>
@@ -76,8 +99,8 @@ const Header = () => {
         {user ? ( // Check for 'user' instead of 'isAuthenticated'
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <button 
-             onClick={() => dispatch(setUser(null))} // Dispatch setUser(null) for logout
-             style={{...buttonStyle, backgroundColor: '#f0eaff', color: '#6a5acd', marginLeft: '1rem'}}
+             onClick={handleLogout} // Dispatch setUser(null) for logout
+            style={{...buttonStyle, backgroundColor: '#f0eaff', color: '#6a5acd', marginLeft: '1rem'}}
             >
               Logout
             </button>
