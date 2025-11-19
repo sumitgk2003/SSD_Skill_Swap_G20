@@ -14,7 +14,7 @@ const messageRouter = Router();
 messageRouter.route("/contacts").get(verifyJWT, getContacts);
 messageRouter.route("/partners").get(verifyJWT, getPartners);
 messageRouter.route("/msg/:id").get(verifyJWT, getMessagesById);
-messageRouter.route("/send/:id").get(verifyJWT, sendMessage);
+messageRouter.route("/send/:id").post(verifyJWT, sendMessage);
 
 export default messageRouter;
 
