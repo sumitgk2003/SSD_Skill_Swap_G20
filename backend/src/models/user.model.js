@@ -13,19 +13,23 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    learnSkill: {
+    interests: {
       type: Array,
       default: [],
       items: {
         type: String,
       },
     },
-    teachSkill: {
+    skills: {
       type: Array,
       default: [],
       items: {
         type: String,
       },
+    },
+    bio: {
+      type: String,
+      default: "",
     },
     password: {
       type: String,

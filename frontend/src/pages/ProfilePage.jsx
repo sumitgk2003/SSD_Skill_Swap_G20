@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux'; // Import useSelector
 
 const ProfilePage = () => {
   const navigate = useNavigate();
+  const userBio = useSelector((state) => state.auth.bio); // Get bio from Redux
   const userSkills = useSelector((state) => state.auth.skills); // Get skills from Redux
   const userInterests = useSelector((state) => state.auth.interests); // Get interests from Redux
 
@@ -85,7 +86,7 @@ const ProfilePage = () => {
         <div style={avatarStyle}>U</div>
         <div>
           <h1 style={nameStyle}>User Name</h1>
-          <p style={bioStyle}>Passionate developer and mentor, eager to share knowledge about React and modern web technologies.</p>
+          <p style={bioStyle}>{userBio||`Tell everyone a little about yourself...`}</p>
           <button style={buttonStyle} onClick={() => navigate('/create-profile')}>Edit Profile</button>
         </div>
       </div>

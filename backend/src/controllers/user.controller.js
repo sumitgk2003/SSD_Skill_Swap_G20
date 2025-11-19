@@ -131,69 +131,39 @@ const logoutUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "User logged Out Successfully"));
 });
 
-const createQuery = asyncHandler(async (req, res) => {
-  const { queryText, classId } = req.body;
-  if ([queryText, classId].some((field) => !field || field.trim() === "")) {
-    throw new ApiError(400, "All fields are required");
+const updateProfile = asyncHandler(async (req, res) => {
+  const { interests, skills, bio } = req.body;
+  console.log("jhdbsfjk");
+  if (!Array.isArray(interests)) {
+    throw new ApiError(400, "Interests must be an array");
   }
-  // Check if class exists and is active
-  const classInstance = await Class.findById(classId);
-  if (!classInstance) {
-    throw new ApiError(404, "Class does not exist");
-  }
-  if (classInstance.status !== "active") {
-    throw new ApiError(400, "Class is not active");
-  }
-  const query = await Query.create({
-    class: classId,
-    queryText,
-    student: req.user._id,
-  });
-  const createdQuery = await Query.findById(query._id).populate(
-    "student",
-    "name email"
-  );
-  if (!createdQuery) {
-    throw new ApiError(500, "Something went wrong while creating query");
-  }
-  // --- SOCKET.IO IMPLEMENTATION ---
-  const io = req.app.get("io");
-  if (io) {
-    io.to(createdQuery.class.toString()).emit("queryUpdate", {
-      classId: createdQuery.class.toString(),
-      message: "New query posted",
-    });
-  }
-  return res
-    .status(201)
-    .json(new ApiResponse(200, createdQuery, "Query created Successfully"));
-});
-
-const getCreatedQueries = asyncHandler(async (req, res) => {
-  const { classId } = req.query;
-
-  // Only allow if student has joined the class (activeClass matches classId)
-  if (classId && req.user.userRole === "student") {
-    if (!req.user.activeClass || req.user.activeClass.toString() !== classId) {
-      throw new ApiError(
-        403,
-        "You have not joined this class. Please enter the access code to join."
-      );
-    }
+  if (!Array.isArray(skills)) {
+    throw new ApiError(400, "Skills must be an array");
+  } 
+  if (typeof bio !== "string") {
+    throw new ApiError(400, "Bio must be a string");
   }
 
-  const filter = { student: req.user._id };
-  if (classId) {
-    filter.class = classId;
+  console.log("Updating profile for user:", req.user._id);
+  console.log("New interests:", interests);
+  console.log("New skills:", skills);
+  console.log("New bio:", bio);
+
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user._id,
+    { interests, skills, bio },
+    { new: true }
+  ).select("-password -refreshToken");
+
+  if (!updatedUser) {
+    throw new ApiError(500, "Failed to update profile");
   }
-  const queries = await Query.find(filter)
-    .populate("student", "name email")
-    .sort({ createdAt: -1 });
 
   return res
     .status(200)
-    .json(new ApiResponse(200, queries, "Your queries fetched successfully"));
+    .json(new ApiResponse(200, updatedUser, "Profile updated successfully"));
 });
+
 
 const getAllActiveClasses = asyncHandler(async (req, res) => {
   const classes = await Class.find({
@@ -262,8 +232,7 @@ export {
   registerUser,
   loginUser,
   logoutUser,
-  createQuery,
-  getCreatedQueries,
+  updateProfile,
   getAllActiveClasses,
   joinClass,
 };

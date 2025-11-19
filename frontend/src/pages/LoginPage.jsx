@@ -2,7 +2,7 @@
 import React from 'react';
 import { useDispatch } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
-import { setSkills, setUser,setInterests } from '../store/authSlice'; // Import setUser action
+import { setSkills, setUser,setInterests,setBio } from '../store/authSlice'; // Import setUser action
 import axios from 'axios';
 
 const LoginPage = () => {
@@ -29,10 +29,11 @@ const LoginPage = () => {
           email: res.data.data.user.email,
           id: res.data.data.user._id,
         };
-        dispatch(setUser(user));
-        dispatch(setSkills(res.data.data.user.teachSkill || []));
-        dispatch(setInterests(res.data.data.user.learnSkill || []));
         console.log("Login successful:", res);
+        dispatch(setUser(user));
+        dispatch(setBio(res.data.data.user.bio || ""));
+        dispatch(setSkills(res.data.data.user.skills || []));
+        dispatch(setInterests(res.data.data.user.interests || []));
         navigate("/dashboard");
         //toast.success(res.data.message);
       }

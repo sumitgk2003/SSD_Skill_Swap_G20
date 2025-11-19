@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { setSkills, setInterests } from '../store/authSlice';
-
+import { setSkills, setInterests, setBio } from '../store/authSlice';
+import axios from 'axios';
 const CreateProfilePage = () => {
   const dispatch = useDispatch();
   const userSkills = useSelector((state) => state.auth.skills);
   const userInterests = useSelector((state) => state.auth.interests);
-
-  const [bio, setBio] = useState('');
+  const userBio = useSelector((state) => state.auth.bio);
+  const [bio, setLocalBio] = useState('');
   const [teachingSkillInput, setTeachingSkillInput] = useState('');
   const [learningSkillInput, setLearningSkillInput] = useState('');
   const [currentTeachingSkills, setCurrentTeachingSkills] = useState([]);
@@ -15,11 +15,13 @@ const CreateProfilePage = () => {
   const [showSaveMessage, setShowSaveMessage] = useState(false); // New state for save message
 
   useEffect(() => {
+    setLocalBio(userBio || '');
     setCurrentTeachingSkills(userSkills);
     setCurrentLearningSkills(userInterests);
     console.log('CreateProfilePage: Initial userSkills from Redux:', userSkills);
     console.log('CreateProfilePage: Initial userInterests from Redux:', userInterests);
-  }, [userSkills, userInterests]);
+    console.log('CreateProfilePage: Initial userBio from Redux:', userBio);
+  }, [userSkills, userInterests, userBio]);
 
   const addSkill = (type) => {
     if (type === 'teach' && teachingSkillInput && !currentTeachingSkills.includes(teachingSkillInput)) {
@@ -47,13 +49,33 @@ const CreateProfilePage = () => {
       }
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async() => {
     console.log('CreateProfilePage: Saving profile...');
     console.log('CreateProfilePage: Dispatching setSkills with:', currentTeachingSkills);
-    dispatch(setSkills(currentTeachingSkills));
     console.log('CreateProfilePage: Dispatching setInterests with:', currentLearningSkills);
-    dispatch(setInterests(currentLearningSkills));
-    // In a real application, you would also send this data to a backend API
+    try {
+      const res = await axios.post(
+        `http://localhost:8000/api/v1/users/updateProfile`,
+        {
+          interests: currentLearningSkills,
+          skills: currentTeachingSkills,
+          bio: bio,
+        },
+        {
+          withCredentials: true,
+        }
+      );
+      if (res.data.success) {
+        console.log("Profile update successful:", res);
+        dispatch(setSkills(currentTeachingSkills));
+        dispatch(setInterests(currentLearningSkills));
+        dispatch(setBio(bio));
+      }
+    } catch (error) {
+      console.error("Error during profile update:", error);
+    } finally {
+      
+    }
     
     setShowSaveMessage(true); // Show the message
     setTimeout(() => {
@@ -88,8 +110,8 @@ const CreateProfilePage = () => {
           <h2 style={sectionTitleStyle}>Your Bio</h2>
           <textarea 
             value={bio} 
-            onChange={(e) => setBio(e.target.value)} 
-            placeholder="Tell everyone a little about yourself..." 
+            onChange={(e) => setLocalBio(e.target.value)} 
+            placeholder={userBio||`Tell everyone a little about yourself...`} 
             style={{...inputStyle, width: '100%', minHeight: '100px', boxSizing: 'border-box', marginBottom: '2rem' }} 
           />
         </div>

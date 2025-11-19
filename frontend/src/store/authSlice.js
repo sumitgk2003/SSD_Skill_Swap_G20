@@ -4,6 +4,7 @@ const initialState={
   user:null,
   skills:[],
   interests:[],
+  bio: ""
 }
 
 const authSlice = createSlice({
@@ -18,8 +19,11 @@ const authSlice = createSlice({
     },
     setInterests:(state,action)=>{
       state.interests = action.payload;
+    },
+    setBio:(state,action)=>{
+      state.bio = action.payload;
     }
   }
 })
-export const {setUser,setSkills,setInterests}=authSlice.actions;
+export const {setUser,setSkills,setInterests,setBio}=authSlice.actions;
 export default authSlice.reducer;
