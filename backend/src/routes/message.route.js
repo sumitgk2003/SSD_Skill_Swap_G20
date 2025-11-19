@@ -1,20 +1,20 @@
-import express from "express";
+import {Router} from "express";
 import {
   getContacts,
   getMessagesById,
   getPartners,
   sendMessage,
-} from "../controller/message.controller.js";
-import { authenticateUser } from "../lib/auth.middleware.js";
+} from "../controllers/message.controller.js";
 
-const messageRouter = express.Router();
+import {verifyJWT} from "../middlewares/auth.middleware.js";
 
-messageRouter.use(authenticateUser);
+const messageRouter = Router();
 
-messageRouter.get("/contacts", getContacts);
-messageRouter.get("/partners", getPartners);
-messageRouter.get("/:id", getMessagesById);
-messageRouter.post("/send/:id", sendMessage);
+
+messageRouter.route("/contacts").get(verifyJWT, getContacts);
+messageRouter.route("/partners").get(verifyJWT, getPartners);
+messageRouter.route("/msg/:id").get(verifyJWT, getMessagesById);
+messageRouter.route("/send/:id").get(verifyJWT, sendMessage);
 
 export default messageRouter;
 
