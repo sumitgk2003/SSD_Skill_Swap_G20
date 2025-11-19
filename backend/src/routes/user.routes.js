@@ -1,5 +1,5 @@
 import {Router} from "express";
-import {registerUser,loginUser,logoutUser,updateProfile} from "../controllers/user.controller.js";
+import {registerUser,loginUser,logoutUser,updateProfile,findMatches} from "../controllers/user.controller.js";
 
 import {verifyJWT} from "../middlewares/auth.middleware.js";
 
@@ -12,4 +12,5 @@ router.route("/login").post(loginUser);
 
 router.route("/logout").post(verifyJWT,logoutUser);
 router.route("/updateProfile").post(verifyJWT,updateProfile);
+router.route("/getMatches").post(verifyJWT, findMatches);
 export default router;

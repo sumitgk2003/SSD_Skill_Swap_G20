@@ -164,68 +164,51 @@ const updateProfile = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, updatedUser, "Profile updated successfully"));
 });
 
+const findMatches = asyncHandler(async (req, res) => {
+  // 1. Get inputs
+  const { interest } = req.body;
+  const userId = req.user._id;
 
-const getAllActiveClasses = asyncHandler(async (req, res) => {
-  const classes = await Class.find({
-    status: "active",
+  // 2. Validation
+  if (!interest) {
+    throw new ApiError(400, "Interest parameter is required");
+  }
+
+  // 3. Fetch the Current User to get their 'skills'
+  // (req.user only has _id, so we must fetch the full doc to see what skills they can offer)
+  const currentUser = await User.findById(userId).select("skills");
+  
+  if (!currentUser) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // 4. Run the Reciprocal Query
+  const candidates = await User.find({
+    _id: { $ne: userId },                     // Exclude the user themselves
+    skills: interest,                         // Filter 1: They teach what user wants
+    interests: { $in: currentUser.skills }    // Filter 2: They want what user teaches
   })
-    .select("-accessCode")
-    .populate("teacher", "name email")
-    .sort({ createdAt: -1 });
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(200, classes, "All active classes fetched successfully")
+  .select("name interests") 
+  .lean();
+
+  // 5. Format the results
+  const matches = candidates.map((candidate) => {
+    
+    // Identify ALL skills of YOURS they are interested in
+    const skillsTheyWant = candidate.interests.filter(candidateInterest => 
+      currentUser.skills.includes(candidateInterest)
     );
-});
 
-const joinClass = asyncHandler(async (req, res) => {
-  const { classId, accessCode } = req.body;
-
-  if (!classId || !accessCode) {
-    throw new ApiError(400, "Class ID and Access Code are required");
-  }
-
-  // Renamed from 'classs' to 'classInstance' for safety
-  const classInstance = await Class.findById(classId);
-
-  if (!classInstance) {
-    throw new ApiError(404, "Class does not exist");
-  }
-
-  if (classInstance.status === "notActive") {
-    throw new ApiError(400, "Class has ended");
-  }
-
-  if (classInstance.accessCode !== accessCode) {
-    throw new ApiError(401, "AccessCode is not correct");
-  }
-
-  const updatedStudent = await Student.findByIdAndUpdate(
-    req.user._id,
-    {
-      $set: {
-        activeClass: classId,
-      },
-    },
-    {
-      new: true,
-    }
-  ).select("-password -refreshToken");
-
-  if (!updatedStudent) {
-    throw new ApiError(500, "Failed to update student's active class status.");
-  }
+    return {
+      user_id: candidate._id,
+      name: candidate.name,
+      skills_they_want: skillsTheyWant 
+    };
+  });
 
   return res
     .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        { student: updatedStudent },
-        "Access granted and active class set successfully"
-      )
-    );
+    .json(new ApiResponse(200, matches, "Matches fetched successfully"));
 });
 
 export {
@@ -233,6 +216,5 @@ export {
   loginUser,
   logoutUser,
   updateProfile,
-  getAllActiveClasses,
-  joinClass,
+  findMatches
 };
