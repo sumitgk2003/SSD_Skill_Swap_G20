@@ -1,54 +1,52 @@
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { NavLink, Link } from 'react-router-dom';
-import { setUser, setBio, setSkills, setInterests } from '../store/authSlice'; // Import setUser action
+import { NavLink, Link, useNavigate } from 'react-router-dom';
+import { setUser, setBio, setSkills, setInterests } from '../store/authSlice';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
-const Header = () => {
-  const { user } = useSelector((state) => state.auth); // Use 'user' instead of 'isAuthenticated'
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const headerStyle = {
+import ThemeToggleButton from './ThemeToggleButton';
+
+const styles = {
+  header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '1rem 2rem',
-    backgroundColor: '#fff',
-    borderBottom: '1px solid #eee',
+    backgroundColor: 'var(--background-primary)',
+    borderBottom: '1px solid var(--border-color)',
     position: 'sticky',
     top: 0,
     zIndex: 10,
-  };
-
-  const logoStyle = {
+    transition: 'background-color 0.3s ease, border-color 0.3s ease',
+  },
+  logo: {
     fontSize: '1.5rem',
     fontWeight: 'bold',
-    color: '#6a5acd',
+    color: 'var(--accent-primary)',
     textDecoration: 'none',
-  };
-
-  const navStyle = {
+  },
+  nav: {
     display: 'flex',
     gap: '0.5rem',
     alignItems: 'center',
-  };
-
-  const navLinkStyle = {
+  },
+  navLink: {
     textDecoration: 'none',
-    color: '#555',
+    color: 'var(--text-secondary)',
     fontWeight: 500,
     fontSize: '1rem',
     padding: '0.5rem 1rem',
     borderRadius: '6px',
     transition: 'background-color 0.2s ease-in-out, color 0.2s ease-in-out',
-  };
-  
-  const activeNavLinkStyle = {
-    color: '#6a5acd',
+  },
+  navLinkActive: {
+    color: 'var(--accent-primary)',
     fontWeight: 'bold',
-  };
-
-  const buttonStyle = {
+  },
+  headerButtons: {
+    display: 'flex',
+    alignItems: 'center',
+  },
+  button: {
     padding: '0.6rem 1.2rem',
     border: 'none',
     borderRadius: '8px',
@@ -57,10 +55,29 @@ const Header = () => {
     textDecoration: 'none',
     display: 'inline-block',
     textAlign: 'center',
-  };
+    transition: 'filter 0.2s ease-in-out',
+  },
+  buttonLogout: {
+    backgroundColor: 'var(--accent-primary-light)',
+    color: 'var(--accent-primary)',
+    marginLeft: '1rem',
+  },
+  buttonLogin: {
+    backgroundColor: 'transparent',
+    color: 'var(--accent-primary)',
+  },
+  buttonSignup: {
+    backgroundColor: 'var(--accent-primary)',
+    color: 'white',
+    marginLeft: '1rem',
+  },
+};
 
-  const getNavLinkStyle = ({ isActive }) => 
-    isActive ? { ...navLinkStyle, ...activeNavLinkStyle } : navLinkStyle;
+
+const Header = () => {
+  const { user } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const handleLogout = async() => {
     try {
@@ -84,31 +101,34 @@ const Header = () => {
     }
   };
 
+  const getNavLinkStyle = ({ isActive }) => ({
+    ...styles.navLink,
+    ...(isActive ? styles.navLinkActive : {}),
+  });
+
   return (
-    <header style={headerStyle}>
-      <Link to="/" style={logoStyle}>SkillSwap</Link>
-      <nav style={navStyle}>
+    <header style={styles.header}>
+      <Link to="/" style={styles.logo}>SkillSwap</Link>
+      <nav style={styles.nav}>
         {user && <NavLink to="/browse" style={getNavLinkStyle}>Browse Skills</NavLink>}
         {user && <NavLink to="/dashboard" style={getNavLinkStyle}>Dashboard</NavLink>}
         {user && <NavLink to="/profile" style={getNavLinkStyle}>Profile</NavLink>}
         {user && <NavLink to="/find-matches" style={getNavLinkStyle}>Your Matches</NavLink>}
         {user && <NavLink to="/schedule" style={getNavLinkStyle}>Your Meets</NavLink>}
-        {/* You can add other public links like 'About Us' here */}
       </nav>
-      <div>
-        {user ? ( // Check for 'user' instead of 'isAuthenticated'
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <button 
-             onClick={handleLogout} // Dispatch setUser(null) for logout
-            style={{...buttonStyle, backgroundColor: '#f0eaff', color: '#6a5acd', marginLeft: '1rem'}}
-            >
-              Logout
-            </button>
-          </div>
+      <div style={styles.headerButtons}>
+        <ThemeToggleButton />
+        {user ? (
+          <button 
+            onClick={handleLogout}
+            style={{ ...styles.button, ...styles.buttonLogout }}
+          >
+            Logout
+          </button>
         ) : (
           <>
-            <Link to="/login" style={{...buttonStyle, backgroundColor: 'transparent', color: '#6a5acd'}}>Log In</Link>
-            <Link to="/signup" style={{...buttonStyle, backgroundColor: '#6a5acd', color: 'white', marginLeft: '1rem'}}>Sign Up</Link>
+            <Link to="/login" style={{ ...styles.button, ...styles.buttonLogin }}>Log In</Link>
+            <Link to="/signup" style={{ ...styles.button, ...styles.buttonSignup }}>Sign Up</Link>
           </>
         )}
       </div>
