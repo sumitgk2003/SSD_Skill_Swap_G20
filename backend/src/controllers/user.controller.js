@@ -392,6 +392,43 @@ const respondRequest = asyncHandler(async (req, res) => {
     );
 });
 
+// New function to get all unique skills and interests
+const getAllSkills = asyncHandler(async (req, res) => {
+  const allSkillsAndInterests = await User.aggregate([
+    {
+      $project: {
+        skills: 1, // Project only the skills field
+        interests: 1 // Project only the interests field
+      }
+    },
+    {
+      $group: {
+        _id: null, // Group all documents into a single group
+        uniqueSkills: { $addToSet: "$skills" }, // Add each skill to a set to ensure uniqueness
+        uniqueInterests: { $addToSet: "$interests" } // Add each interest to a set to ensure uniqueness
+      }
+    },
+    {
+      $project: {
+        _id: 0, // Exclude the default _id field
+        allUnique: { $concatArrays: ["$uniqueSkills", "$uniqueInterests"] } // Concatenate skills and interests
+      }
+    }
+  ]);
+
+  if (!allSkillsAndInterests || allSkillsAndInterests.length === 0) {
+    return res.status(200).json(new ApiResponse(200, [], "No skills or interests found"));
+  }
+
+  // Flatten the array of arrays into a single array and remove duplicates
+  const flattenedUniqueArray = [...new Set(allSkillsAndInterests[0].allUnique.flat())];
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, flattenedUniqueArray, "All unique skills and interests fetched successfully"));
+});
+
+
 export {
   registerUser,
   loginUser,
@@ -401,5 +438,6 @@ export {
   sendRequest,
   getPendingRequests,
   getConnectedUsers,
-  respondRequest
+  respondRequest,
+  getAllSkills // Export the new function
 };
