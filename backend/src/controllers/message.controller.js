@@ -1,32 +1,23 @@
-import User from "../models/user.js";
-import Message from "../models/message.js";
-import { v2 as cloudinary } from "cloudinary";
-import { io, Reciever } from "../socket.js";
-
-export const getContacts = async (req, res) => {
-  try {
-    const user = await User.find({
-      _id: {
-        $ne: req.user._id,
-      },
-    }).select("-password");
-
-    res.status(200).json(user);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Error in getContacts function" });
-  }
-};
+import { User } from "../models/user.model.js";
+import Message from "../models/message.model.js";
+import { Match } from "../models/match.model.js";
+import { io, Reciever } from "../app.js";
 
 export const getMessagesById = async (req, res) => {
   try {
-    const message = await Message.find({
-      $or: [
-        { sendersId: req.user._id, recieversId: req.params.id },
-        { sendersId: req.params.id, recieversId: req.user._id },
-      ],
+    // NOW: Takes matchId from body
+    const { matchId } = req.body;
+
+    if (!matchId) {
+      return res.status(400).json({ message: "Match ID is required" });
+    }
+
+    // Find messages belonging to this specific match
+    const messages = await Message.find({
+      matchId: matchId,
     }).select("-password");
-    res.status(200).json(message);
+
+    res.status(200).json(messages);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error in getMessagesById function" });
@@ -34,59 +25,41 @@ export const getMessagesById = async (req, res) => {
 };
 
 export const sendMessage = async (req, res) => {
-  const { text, image } = req.body;
+  const { matchId, text } = req.body; // Changed to take matchId and text
   try {
-    let imgUrl = null;
-    if (image) {
-      const uploadedImg = await cloudinary.uploader.upload(image);
-      imgUrl = uploadedImg.secure_url;
+    // Removed image handling
+
+    // Find the match to get the recipient's ID
+    const match = await Match.findById(matchId);
+    if (!match) {
+      return res.status(404).json({ message: "Match not found" });
+    }
+
+    let recieverId;
+    if (match.user1.toString() === req.user._id.toString()) {
+      recieverId = match.user2;
+    } else if (match.user2.toString() === req.user._id.toString()) {
+      recieverId = match.user1;
+    } else {
+      return res.status(403).json({ message: "You are not part of this match" });
     }
 
     const newMessage = new Message({
       sendersId: req.user._id,
-      recieversId: req.params.id,
+      recieversId: recieverId, // Use the determined recieverId
+      matchId: matchId, // Associate message with the match
       text,
-      image: imgUrl,
     });
 
     await newMessage.save();
 
-    const recSocketId = Reciever(req.params.id);
+    const recSocketId = Reciever(recieverId); // Use recieverId
     if (recSocketId) io.to(recSocketId).emit("newMessage", newMessage);
 
     res.status(201).json(newMessage);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error in sendMessage function" });
-  }
-};
-
-export const getPartners = async (req, res) => {
-  try {
-    const allMessages = await Message.find({
-      $or: [{ sendersId: req.user._id }, { recieversId: req.user._id }],
-    });
-
-    const partnersIds = [
-      ...new Set(
-        allMessages.map((msg) =>
-          msg.sendersId.toString() === req.user._id.toString()
-            ? msg.recieversId.toString()
-            : msg.sendersId.toString(),
-        ),
-      ),
-    ];
-
-    const partners = await User.find({
-      _id: {
-        $in: partnersIds,
-      },
-    }).select("-password");
-
-    res.status(200).json(partners);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Error in getPartners function" });
   }
 };
 
