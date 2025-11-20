@@ -1,56 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-
-const mockUsers = [
-  {
-    id: 1,
-    name: 'Alice Johnson',
-    avatar: 'A',
-    skillsToTeach: ['Machine Learning', 'Creative Writing'],
-    skillsToLearn: ['React'],
-    bio: 'Data Scientist solving problems at scale, making predictions, and finding patterns. I use Python, SQL, and algorithms.'
-  },
-  {
-    id: 2,
-    name: 'Bob Williams',
-    avatar: 'B',
-    skillsToTeach: ['Python 3'],
-    skillsToLearn: ['Public Speaking', 'Node.js'],
-    bio: 'Learn the basics of Python 3.12, one of the most powerful, versatile, and in-demand programming languages today.'
-  },
-  {
-    id: 3,
-    name: 'Charlie Brown',
-    avatar: 'C',
-    skillsToTeach: ['Security+', 'Graphic Design'],
-    skillsToLearn: ['Pottery'],
-    bio: 'Master IT security basics and prep for the CompTIA Security+ exam with hands-on learning on threats and cryptography.'
-  },
-  {
-    id: 4,
-    name: 'Diana Prince',
-    avatar: 'D',
-    skillsToTeach: ['Code Foundations', 'Python'],
-    skillsToLearn: ['Yoga Instruction'],
-    bio: 'Start your programming journey with an introduction to the world of code and basic concepts. Perfect for beginners.'
-  },
-    {
-    id: 5,
-    name: 'Ethan Hunt',
-    avatar: 'E',
-    skillsToTeach: ['Advanced CSS', 'React'],
-    skillsToLearn: ['Bread Making'],
-    bio: 'I can teach you how to create complex and responsive layouts using modern CSS techniques like Flexbox and Grid.'
-  },
-  {
-    id: 6,
-    name: 'Fiona Glenanne',
-    avatar: 'F',
-    skillsToTeach: ['UX Research', 'Spanish'],
-    skillsToLearn: ['Salsa Dancing'],
-    bio: 'Expert in user-centered design methodologies, from interviews and surveys to usability testing and persona creation.'
-  },
-];
+import axios from 'axios';
 
 const pillColors = [
     { bg: '#FDE68A', text: '#92400E' }, // Yellow
@@ -60,8 +10,8 @@ const pillColors = [
 ];
 
 // User Card Component
-const UserCard = ({ user, onConnect, connectionStatus }) => {
-    const pillColor = pillColors[user.id % pillColors.length];
+const UserCard = ({ user, interest, onConnect, connectionStatus }) => {
+    const pillColor = pillColors[user.user_id.charCodeAt(0) % pillColors.length];
 
     const cardStyle = {
         backgroundColor: 'var(--background-secondary)',
@@ -116,12 +66,12 @@ const UserCard = ({ user, onConnect, connectionStatus }) => {
             onMouseLeave={() => setHovered(false)}
         >
             <div>
-                <span style={pillStyle}>{user.skillsToTeach[0]}</span>
+                <span style={pillStyle}>{interest}</span>
             </div>
             <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-primary)', fontWeight: 'bold' }}>{user.name}</h3>
-            <p style={{ margin: 0, color: 'var(--text-secondary)', flexGrow: 1 }}>{user.bio}</p>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', flexGrow: 1 }}>This user can teach you {interest} and is interested in learning one of your skills.</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                <span>Wants to learn: {user.skillsToLearn[0]}</span>
+                <span>Wants to learn: {user.skills_they_want.join(', ')}</span>
             </div>
             <button 
                 style={connectButtonStyle}
@@ -141,21 +91,60 @@ const UserCard = ({ user, onConnect, connectionStatus }) => {
 const BrowseSkillsPage = () => {
   const { interests: userInterests } = useSelector((state) => state.auth);
   const [requestedUsers, setRequestedUsers] = useState(new Set());
+  const [matches, setMatches] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const [activeInterest, setActiveInterest] = useState('All');
   const interestsForFilter = useMemo(() => ['All', ...userInterests], [userInterests]);
-
-  const filteredUsers = useMemo(() => {
-    if (activeInterest === 'All') return mockUsers;
-
-    const lowercasedInterest = activeInterest.toLowerCase();
-    return mockUsers.filter(user => 
-        user.skillsToTeach.some(skill => skill.toLowerCase().includes(lowercasedInterest))
-    );
+  
+  useEffect(() => {
+    if (activeInterest && activeInterest !== 'All') {
+      fetchMatches(activeInterest);
+    } else {
+      setMatches([]);
+    }
   }, [activeInterest]);
 
-  const handleConnect = (userToConnect) => {
-    setRequestedUsers(prev => new Set(prev).add(userToConnect.id));
+  const fetchMatches = async (interest) => {
+    setLoading(true);
+    try {
+      const res = await axios.post(
+        'http://localhost:8000/api/v1/users/getMatches',
+        { interest },
+        { withCredentials: true }
+      );
+      if (res.data.success) {
+        setMatches(res.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching matches:", error);
+      setMatches([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConnect = async (userToConnect) => {
+    if (!userToConnect.skills_they_want || userToConnect.skills_they_want.length === 0) {
+      console.error("Cannot connect: No matching skills they want.");
+      return;
+    }
+
+    try {
+        await axios.post(
+            'http://localhost:8000/api/v1/users/sendRequest',
+            {
+                recipientId: userToConnect.user_id,
+                learnSkill: activeInterest, // Skill you want to learn
+                teachSkill: userToConnect.skills_they_want[0], // Skill they want to learn from you
+            },
+            { withCredentials: true }
+        );
+        setRequestedUsers(prev => new Set(prev).add(userToConnect.user_id));
+    } catch (error) {
+        console.error("Error sending connection request:", error);
+        alert(error.response?.data?.message || 'Failed to send request.');
+    }
   };
 
   const getConnectionStatus = (userId) => {
@@ -231,16 +220,21 @@ const BrowseSkillsPage = () => {
             )}
         </div>
 
-        <div style={usersGridStyle}>
-          {filteredUsers.map(user => (
-            <UserCard 
-                key={user.id} 
-                user={user} 
-                onConnect={handleConnect}
-                connectionStatus={getConnectionStatus(user.id)}
-            />
-          ))}
-        </div>
+        {loading ? <p>Finding matches...</p> : (
+            <div style={usersGridStyle}>
+              {matches.map(user => (
+                <UserCard 
+                    key={user.user_id} 
+                    user={user}
+                    interest={activeInterest}
+                    onConnect={handleConnect}
+                    connectionStatus={getConnectionStatus(user.user_id)}
+                />
+              ))}
+            </div>
+        )}
+        {activeInterest !== 'All' && !loading && matches.length === 0 && <p>No reciprocal matches found for "{activeInterest}". Try another skill!</p>}
+        {activeInterest === 'All' && <p>Select an interest you want to learn to find potential matches.</p>}
       </div>
     </div>
   );

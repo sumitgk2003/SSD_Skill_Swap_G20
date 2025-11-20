@@ -1,55 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-
-// Mock data now includes messages and profile pictures
-const mockMatchesData = [
-  { 
-    id: 1, 
-    name: 'Alice', 
-    teaches: 'Creative Writing', 
-    learns: 'React', 
-    pic: 'https://placehold.co/100x100/6a5acd/FFF?text=A',
-    messages: [
-      { id: 1, sender: 'Alice', text: 'Hey! I see you want to learn React. I can help!' },
-      { id: 2, sender: 'You', text: 'That would be great! I can teach you creative writing in exchange.' },
-    ]
-  },
-  { 
-    id: 2, 
-    name: 'Bob', 
-    teaches: 'Public Speaking', 
-    learns: 'Node.js',
-    pic: 'https://placehold.co/100x100/5a4bad/FFF?text=B',
-    messages: [
-      { id: 1, sender: 'Bob', text: 'Hi, interested in learning Node.js?' },
-    ]
-  },
-  { 
-    id: 3, 
-    name: 'Charlie', 
-    teaches: 'Graphic Design', 
-    learns: 'Pottery',
-    pic: 'https://placehold.co/100x100/4a3ba9/FFF?text=C',
-    messages: []
-  },
-  { 
-    id: 4, 
-    name: 'Diana', 
-    teaches: 'Yoga Instruction', 
-    learns: 'Python',
-    pic: 'https://placehold.co/100x100/3a2ba5/FFF?text=D',
-    messages: [
-      { id: 1, sender: 'Diana', text: 'Namaste. Let me know if youd like to start with Python.' },
-    ]
-  },
-  { 
-    id: 5, 
-    name: 'Eve', 
-    teaches: 'Bread Making', 
-    learns: 'React',
-    pic: 'https://placehold.co/100x100/2a1ba1/FFF?text=E',
-    messages: []
-  },
-];
+import axios from 'axios';
 
 // --- ChatWindow Component ---
 const ChatWindow = ({ user, onSendMessage, onOpenScheduler, confirmation }) => {
@@ -80,7 +30,7 @@ const ChatWindow = ({ user, onSendMessage, onOpenScheduler, confirmation }) => {
           <img src={user.pic} alt={user.name} style={styles.chatHeaderPic} />
           <div>
             <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#333', margin: 0 }}>{user.name}</h2>
-            <div style={{ fontSize: 13, color: '#666' }}>{user.teaches} • wants {user.learns}</div>
+            <div style={{ fontSize: 13, color: '#666' }}>Teaches you: {user.teaches} • Learns from you: {user.learns}</div>
           </div>
         </div>
 
@@ -136,8 +86,9 @@ const ChatWindow = ({ user, onSendMessage, onOpenScheduler, confirmation }) => {
 
 // --- FindMatchesPage Component ---
 const FindMatchesPage = () => {
-  const [matches, setMatches] = useState(mockMatchesData);
+  const [matches, setMatches] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // scheduler modal state
   const [schedulerOpen, setSchedulerOpen] = useState(false);
@@ -163,6 +114,32 @@ const FindMatchesPage = () => {
       link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap';
       document.head.appendChild(link);
     }
+
+    const fetchConnectedUsers = async () => {
+        setLoading(true);
+        try {
+            const res = await axios.get('http://localhost:8000/api/v1/users/getConnected', { withCredentials: true });
+            if (res.data.success) {
+                const formattedConnections = res.data.data.map(conn => ({
+                    id: conn._id, // Match ID
+                    userId: conn.partner._id,
+                    name: conn.partner.name,
+                    teaches: conn.skill_i_learn, // What they teach you
+                    learns: conn.skill_i_teach, // What they learn from you
+                    pic: `https://placehold.co/100x100/6a5acd/FFF?text=${conn.partner.name.charAt(0)}`,
+                    messages: [], // Initialize with empty messages
+                }));
+                setMatches(formattedConnections);
+            }
+        } catch (error) {
+            console.error("Error fetching connected users:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    fetchConnectedUsers();
+
   }, []);
 
   useEffect(() => {
@@ -267,32 +244,34 @@ const FindMatchesPage = () => {
       <div style={styles.matchListContainer}>
         <h1 style={styles.header}>Your Skill Matches</h1>
         <div style={styles.matchList}>
-          {matches.map(match => (
-            <div 
-              key={match.id} 
-              style={selectedUser?.id === match.id ? styles.matchCardSelected : styles.matchCard}
-              onClick={() => handleSelectUser(match)}
-            >
-              <img src={match.pic} alt={match.name} style={styles.matchPic} />
-              <div style={styles.matchInfo}>
-                <h2 style={styles.name}>{match.name}</h2>
-                <p style={styles.skillLine}>
-                  <strong>Teaches:</strong> <span style={{ color: '#6a5acd' }}>{match.teaches}</span>
-                </p>
-                <p style={styles.skillLine}>
-                  <strong>Learns:</strong> {match.learns}
-                </p>
-              </div>
-              <button 
-                style={styles.messageButton} 
-                onClick={(ev) => { ev.stopPropagation(); handleSelectUser(match); }}
-                aria-label={`Message ${match.name}`}
-              >
-                <span>✉️</span>
-                <span style={{ marginLeft: 6 }}>Message</span>
-              </button>
-            </div>
-          ))}
+            {loading ? <p style={{padding: '1.5rem'}}>Loading connections...</p> : 
+             matches.length === 0 ? <p style={{padding: '1.5rem'}}>No connections yet. Go to Browse Skills to find a partner!</p> :
+              matches.map(match => (
+                <div 
+                  key={match.id} 
+                  style={selectedUser?.id === match.id ? styles.matchCardSelected : styles.matchCard}
+                  onClick={() => handleSelectUser(match)}
+                >
+                  <img src={match.pic} alt={match.name} style={styles.matchPic} />
+                  <div style={styles.matchInfo}>
+                    <h2 style={styles.name}>{match.name}</h2>
+                    <p style={styles.skillLine}>
+                      <strong>Teaches:</strong> <span style={{ color: '#6a5acd' }}>{match.teaches}</span>
+                    </p>
+                    <p style={styles.skillLine}>
+                      <strong>Learns:</strong> {match.learns}
+                    </p>
+                  </div>
+                  <button 
+                    style={styles.messageButton} 
+                    onClick={(ev) => { ev.stopPropagation(); handleSelectUser(match); }}
+                    aria-label={`Message ${match.name}`}
+                  >
+                    <span>✉️</span>
+                    <span style={{ marginLeft: 6 }}>Message</span>
+                  </button>
+                </div>
+            ))}
         </div>
       </div>
 

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import axios from 'axios';
 
 // --- MOCK DATA ---
 const learningSkillsData = [
@@ -41,21 +42,6 @@ const teachingSkillsData = [
     requests: 0,
     upcoming: 3,
   },
-];
-
-const DUMMY_REQUESTS = [
-    {
-        id: 6,
-        name: 'Fiona Glenanne',
-        avatar: 'F',
-        skillsToTeach: ['UX Research', 'Spanish'],
-    },
-    {
-        id: 5,
-        name: 'Ethan Hunt',
-        avatar: 'E',
-        skillsToTeach: ['Advanced CSS', 'React'],
-    }
 ];
 
 const pillColors = [
@@ -118,14 +104,16 @@ const RequestCard = ({ request, onAccept, onDecline }) => {
 
     return (
         <div style={cardStyle}>
-            <div style={avatarStyle}>{request.name.charAt(0)}</div>
+            <div style={avatarStyle}>{request.sender.name.charAt(0)}</div>
             <div style={infoStyle}>
-                <h4 style={nameStyle}>{request.name}</h4>
-                <p style={skillStyle}>Wants to connect about <strong>{request.skillsToTeach[0]}</strong></p>
+                <h4 style={nameStyle}>{request.sender.name}</h4>
+                <p style={skillStyle}>
+                    Wants to learn <strong>{request.teaching_requirement}</strong> from you, and will teach you <strong>{request.learning_opportunity}</strong>.
+                </p>
             </div>
             <div style={buttonGroupStyle}>
-                <button style={acceptButtonStyle} onClick={() => onAccept(request.id)} aria-label={`Accept connection from ${request.name}`}>Accept</button>
-                <button style={declineButtonStyle} onClick={() => onDecline(request.id)} aria-label={`Decline connection from ${request.name}`}>Decline</button>
+                <button style={acceptButtonStyle} onClick={() => onAccept(request._id)} aria-label={`Accept connection from ${request.sender.name}`}>Accept</button>
+                <button style={declineButtonStyle} onClick={() => onDecline(request._id)} aria-label={`Decline connection from ${request.sender.name}`}>Decline</button>
             </div>
         </div>
     );
@@ -218,14 +206,49 @@ const SkillCard = ({ skill, type }) => {
 
 const DashboardPage = () => {
   const { user } = useSelector((state) => state.auth);
-  const [incomingRequests, setIncomingRequests] = useState(DUMMY_REQUESTS);
+  const [incomingRequests, setIncomingRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleAccept = (userId) => {
-    setIncomingRequests(prevRequests => prevRequests.filter(req => req.id !== userId));
+  useEffect(() => {
+    const fetchRequests = async () => {
+      try {
+        const res = await axios.get(
+          'http://localhost:8000/api/v1/users/viewRequests',
+          { withCredentials: true }
+        );
+        if (res.data.success) {
+          setIncomingRequests(res.data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching connection requests:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRequests();
+  }, []);
+
+  const respondToRequest = async (requestId, status) => {
+    try {
+      await axios.post(
+        'http://localhost:8000/api/v1/users/respondRequest',
+        { requestId, status },
+        { withCredentials: true }
+      );
+      setIncomingRequests(prevRequests => prevRequests.filter(req => req._id !== requestId));
+    } catch (error) {
+      console.error(`Error responding to request (${status}):`, error);
+      alert(`Failed to ${status} request.`);
+    }
   };
   
-  const handleDecline = (userId) => {
-    setIncomingRequests(prevRequests => prevRequests.filter(req => req.id !== userId));
+  const handleAccept = (requestId) => {
+    respondToRequest(requestId, 'accepted');
+  };
+  
+  const handleDecline = (requestId) => {
+    respondToRequest(requestId, 'rejected');
   };
 
   const pageStyle = {
@@ -274,13 +297,15 @@ const DashboardPage = () => {
         <h1 style={headerStyle}>Welcome back, {user?.name || 'User'}!</h1>
         <p style={subHeaderStyle}>Here's a snapshot of your learning and teaching journey.</p>
         
-        {incomingRequests.length > 0 && (
+        {loading ? (
+            <p>Loading requests...</p>
+        ) : incomingRequests.length > 0 && (
           <section>
             <h2 style={sectionHeaderStyle}>Connection Requests</h2>
             <div style={{...gridStyle, gridTemplateColumns: '1fr', gap: '1rem'}}>
               {incomingRequests.map(req => (
                 <RequestCard 
-                  key={req.id} 
+                  key={req._id} 
                   request={req} 
                   onAccept={handleAccept}
                   onDecline={handleDecline}
