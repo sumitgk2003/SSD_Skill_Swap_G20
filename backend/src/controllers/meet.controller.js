@@ -75,6 +75,35 @@ export const getMyMeets = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, meets, 'User meets'));
 });
 
+// New function to get meets by match ID
+export const getMeetsByMatchId = asyncHandler(async (req, res) => {
+  const { matchId } = req.body; // Expecting matchId in the request body
+  const userId = req.user._id;
+
+  if (!matchId) {
+    throw new ApiError(400, "Match ID is required in the request body.");
+  }
+
+  // Find meets where the user is the organizer OR the user's email is in the attendees list, AND the matchId matches
+  const meets = await Meet.find({
+    match: matchId,
+    $or: [
+      { organizer: userId },
+      { attendees: { $in: [req.user.email] } } // Assuming req.user.email is available after authentication
+    ]
+  }).sort({ dateAndTime: 1 }).populate('organizer', 'name email').lean();
+
+  // Attach organizerName for frontend convenience
+  meets.forEach(m => {
+    if (m.organizer && m.organizer.name) {
+      m.organizerName = m.organizer.name;
+    }
+  });
+
+  return res.status(200).json(new ApiResponse(200, meets, `Meets for match ID ${matchId}`));
+});
+
+
 export const deleteMeet = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const meet = await Meet.findById(id);
@@ -103,4 +132,3 @@ export const deleteMeet = asyncHandler(async (req, res) => {
   await meet.remove();
   return res.status(200).json(new ApiResponse(200, {}, 'Meet deleted'));
 });
-
