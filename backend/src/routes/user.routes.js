@@ -1,7 +1,8 @@
 import {Router} from "express";
 import {registerUser,loginUser,logoutUser,updateProfile,
 findMatches,sendRequest,getPendingRequests,getConnectedUsers,
-respondRequest, getCurrentUser
+respondRequest,getAllSkills
+,getCurrentUser
 } from "../controllers/user.controller.js";
 
 import {verifyJWT} from "../middlewares/auth.middleware.js";
@@ -22,5 +23,6 @@ router.route("/sendRequest").post(verifyJWT, sendRequest);
 router.route("/viewRequests").get(verifyJWT, getPendingRequests);
 router.route("/respondRequest").post(verifyJWT, respondRequest);
 router.route("/getConnected").get(verifyJWT, getConnectedUsers);
+router.route("/getAllSkills").get(verifyJWT, getAllSkills);
 
 export default router;

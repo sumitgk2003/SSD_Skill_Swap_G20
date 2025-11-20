@@ -144,6 +144,9 @@ const updateProfile = asyncHandler(async (req, res) => {
   if (!Array.isArray(interests)) {
     throw new ApiError(400, "Interests must be an array");
   }
+  // Convert skills to lowercase before validation and saving
+  const lowerCaseSkills = Array.isArray(skills) ? skills.map(skill => skill.toLowerCase()) : [];
+
   if (!Array.isArray(skills)) {
     throw new ApiError(400, "Skills must be an array");
   } 
@@ -153,12 +156,12 @@ const updateProfile = asyncHandler(async (req, res) => {
 
   console.log("Updating profile for user:", req.user._id);
   console.log("New interests:", interests);
-  console.log("New skills:", skills);
+  console.log("New skills:", lowerCaseSkills); // Log the lowercased skills
   console.log("New bio:", bio);
 
   const updatedUser = await User.findByIdAndUpdate(
     req.user._id,
-    { interests, skills, bio },
+    { interests, skills: lowerCaseSkills, bio }, // Use lowerCaseSkills here
     { new: true }
   ).select("-password -refreshToken");
 
@@ -398,6 +401,43 @@ const respondRequest = asyncHandler(async (req, res) => {
     );
 });
 
+// New function to get all unique skills and interests
+const getAllSkills = asyncHandler(async (req, res) => {
+  const allSkillsAndInterests = await User.aggregate([
+    {
+      $project: {
+        skills: 1, // Project only the skills field
+        interests: 1 // Project only the interests field
+      }
+    },
+    {
+      $group: {
+        _id: null, // Group all documents into a single group
+        uniqueSkills: { $addToSet: "$skills" }, // Add each skill to a set to ensure uniqueness
+        uniqueInterests: { $addToSet: "$interests" } // Add each interest to a set to ensure uniqueness
+      }
+    },
+    {
+      $project: {
+        _id: 0, // Exclude the default _id field
+        allUnique: { $concatArrays: ["$uniqueSkills", "$uniqueInterests"] } // Concatenate skills and interests
+      }
+    }
+  ]);
+
+  if (!allSkillsAndInterests || allSkillsAndInterests.length === 0) {
+    return res.status(200).json(new ApiResponse(200, [], "No skills or interests found"));
+  }
+
+  // Flatten the array of arrays into a single array and remove duplicates
+  const flattenedUniqueArray = [...new Set(allSkillsAndInterests[0].allUnique.flat())];
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, flattenedUniqueArray, "All unique skills and interests fetched successfully"));
+});
+
+
 export {
   registerUser,
   loginUser,
@@ -407,6 +447,7 @@ export {
   sendRequest,
   getPendingRequests,
   getConnectedUsers,
-  respondRequest
+  respondRequest,
+  getAllSkills // Export the new function
 };
 export { getCurrentUser };
