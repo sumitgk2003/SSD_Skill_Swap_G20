@@ -64,11 +64,13 @@ import authRouter from "./routes/auth.routes.js";
 import meetRouter from "./routes/meet.routes.js";
 import zoomRouter from "./controllers/zoom.controller.js";
 import messageRouter from "./routes/message.routes.js"; 
+import adminRouter from "./routes/admin.routes.js";
 
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/meets", meetRouter);
 app.use("/api/v1/zoom", zoomRouter);
+app.use("/api/v1/admin", adminRouter);
 
 app.use("/api/v1/messages", messageRouter);
 
