@@ -197,8 +197,7 @@ const ChatSection = ({ skillId, skillTitle, matchedUsers }) => {
         display: 'flex',
         flexDirection: 'column',
         gap: '0.5rem',
-        backgroundImage: 'radial-gradient(circle at 1px 1px, var(--border-color) 0.5px, transparent 0.5px)',
-        backgroundSize: '20px 20px',
+        backgroundColor: 'var(--background-secondary)',
     };
 
     const formStyle = {
@@ -224,7 +223,7 @@ const ChatSection = ({ skillId, skillTitle, matchedUsers }) => {
 
     const sendBtnStyle = {
         padding: '0.875rem 1.75rem',
-        backgroundColor: 'linear-gradient(135deg, var(--accent-primary), #7c5adb)',
+        backgroundColor: 'var(--accent-primary)',
         color: '#fff',
         border: 'none',
         borderRadius: '24px',
@@ -232,7 +231,7 @@ const ChatSection = ({ skillId, skillTitle, matchedUsers }) => {
         fontWeight: '600',
         fontSize: '0.95rem',
         transition: 'all 0.3s ease',
-        boxShadow: '0 4px 12px rgba(122, 90, 219, 0.3)',
+        boxShadow: '0 4px 12px rgba(var(--accent-primary-rgb), 0.3)',
     };
 
     return (
@@ -334,7 +333,7 @@ const ChatSection = ({ skillId, skillTitle, matchedUsers }) => {
                                         style={inputStyle}
                                         onFocus={(e) => {
                                             e.target.style.borderColor = 'var(--accent-primary)';
-                                            e.target.style.boxShadow = '0 0 0 3px rgba(122, 90, 219, 0.1)';
+                                            e.target.style.boxShadow = '0 0 0 3px rgba(89, 146, 241, 0.1)';
                                         }}
                                         onBlur={(e) => {
                                             e.target.style.borderColor = 'var(--border-color)';
@@ -346,11 +345,11 @@ const ChatSection = ({ skillId, skillTitle, matchedUsers }) => {
                                         style={sendBtnStyle}
                                         onMouseEnter={(e) => {
                                             e.target.style.transform = 'translateY(-2px)';
-                                            e.target.style.boxShadow = '0 6px 16px rgba(122, 90, 219, 0.4)';
+                                            e.target.style.boxShadow = '0 6px 16px rgba(89, 146, 241, 0.4)';
                                         }}
                                         onMouseLeave={(e) => {
                                             e.target.style.transform = 'translateY(0)';
-                                            e.target.style.boxShadow = '0 4px 12px rgba(122, 90, 219, 0.3)';
+                                            e.target.style.boxShadow = '0 4px 12px rgba(89, 146, 241, 0.3)';
                                         }}
                                     >
                                         📤 Send
