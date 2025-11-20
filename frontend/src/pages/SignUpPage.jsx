@@ -1,18 +1,17 @@
 
-import React from 'react';
-import { useDispatch } from 'react-redux';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
-import { setSkills, setInterests,setUser } from '../store/authSlice';
+
 const SignUpPage = () => {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [error, setError] = useState(''); // State for error messages
   
   const handleSignUp = async(e) => {
     e.preventDefault(); 
+    setError(''); // Clear previous errors
+
     try {
-      console.log(e.target[0].value, e.target[1].value, e.target[2].value);
       const res = await axios.post(
         `http://localhost:8000/api/v1/users/register`,
         {
@@ -25,23 +24,14 @@ const SignUpPage = () => {
         }
       );
       if (res.data.success) {
-        dispatch(setUser(res.data.data.user));
-        console.log("Login successful:", res);
-        navigate("/dashboard");
-        //toast.success(res.data.message);
+        // Registration is successful, redirect to login page for the user to log in.
+        // The previous implementation incorrectly assumed auto-login.
+        navigate("/login");
       }
     } catch (error) {
-      console.error("Error during login:", error);
-      //toast.error(
-        //error.response?.data?.message || "Login failed. Please try again."
-      //);
-    } finally {
-      //dispatch(setLoading(false));
+      console.error("Error during sign up:", error);
+      setError(error.response?.data?.message || "Sign up failed. Please try again.");
     }
-    //dispatch(setUser({ name: 'Logged In User'}));
-    dispatch(setSkills(['JavaScript', 'React', 'Node.js']));
-    dispatch(setInterests(['Web Development', 'Open Source']));
-    navigate('/dashboard'); // Redirect to dashboard after login 
   };
 
   const pageStyle = {
@@ -108,14 +98,25 @@ const SignUpPage = () => {
     fontWeight: 'bold',
   };
 
+  const errorStyle = {
+    color: '#dc3545',
+    backgroundColor: 'rgba(220, 53, 69, 0.1)',
+    padding: '0.75rem',
+    borderRadius: '8px',
+    marginBottom: '1rem',
+    border: '1px solid rgba(220, 53, 69, 0.2)',
+    fontWeight: '500'
+  };
+
   return (
     <div style={pageStyle}>
       <div style={formContainerStyle}>
         <h2 style={titleStyle}>Create Your Account</h2>
         <form onSubmit={handleSignUp}>
-          <input type="text" placeholder="Full Name" style={inputStyle} required />
-          <input type="email" placeholder="Email Address" style={inputStyle} required />
-          <input type="password" placeholder="Password" style={inputStyle} required />
+          <input type="text" placeholder="Full Name" style={inputStyle} required onChange={() => setError('')}/>
+          <input type="email" placeholder="Email Address" style={inputStyle} required onChange={() => setError('')}/>
+          <input type="password" placeholder="Password" style={inputStyle} required onChange={() => setError('')}/>
+          {error && <p style={errorStyle}>{error}</p>}
           <button type="submit" style={buttonStyle}>
             Sign Up
           </button>

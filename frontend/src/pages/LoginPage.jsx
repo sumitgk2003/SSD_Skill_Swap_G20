@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
 import { setSkills, setUser,setInterests,setBio } from '../store/authSlice'; // Import setUser action
@@ -8,11 +8,12 @@ import axios from 'axios';
 const LoginPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate(); // Initialize useNavigate
+  const [error, setError] = useState(''); // State for error messages
   
   const handleLogin = async (e) => {
     e.preventDefault(); 
+    setError(''); // Clear previous errors on a new attempt
     try {
-      console.log(e.target[0].value, e.target[1].value);
       const res = await axios.post(
         `http://localhost:8000/api/v1/users/login`,
         {
@@ -35,15 +36,14 @@ const LoginPage = () => {
         dispatch(setSkills(res.data.data.user.skills || []));
         dispatch(setInterests(res.data.data.user.interests || []));
         navigate("/dashboard");
-        //toast.success(res.data.message);
       }
     } catch (error) {
       console.error("Error during login:", error);
-      //toast.error(
-        //error.response?.data?.message || "Login failed. Please try again."
-      //);
-    } finally {
-      //dispatch(setLoading(false));
+      if (error.response && (error.response.status === 401 || error.response.status === 404)) {
+        setError('Incorrect email or password. Please try again.');
+      } else {
+        setError(error.response?.data?.message || "Login failed. An unknown error occurred.");
+      }
     }
   };
 
@@ -111,13 +111,24 @@ const LoginPage = () => {
     fontWeight: 'bold',
   };
 
+  const errorStyle = {
+    color: '#dc3545',
+    backgroundColor: 'rgba(220, 53, 69, 0.1)',
+    padding: '0.75rem',
+    borderRadius: '8px',
+    marginBottom: '1rem',
+    border: '1px solid rgba(220, 53, 69, 0.2)',
+    fontWeight: '500'
+  };
+
   return (
     <div style={pageStyle}>
       <div style={formContainerStyle}>
         <h2 style={titleStyle}>Welcome Back!</h2>
         <form onSubmit={handleLogin}>
-          <input type="email" placeholder="Email Address" style={inputStyle} required />
-          <input type="password" placeholder="Password" style={inputStyle} required />
+          <input type="email" placeholder="Email Address" style={inputStyle} required onChange={() => setError('')} />
+          <input type="password" placeholder="Password" style={inputStyle} required onChange={() => setError('')}/>
+          {error && <p style={errorStyle}>{error}</p>}
           <button type="submit" style={buttonStyle}>
             Log In
           </button>
