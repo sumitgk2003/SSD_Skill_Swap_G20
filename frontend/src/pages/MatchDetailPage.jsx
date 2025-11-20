@@ -301,53 +301,103 @@ const ChatSection = ({ matchId, matchUser, skillTitle }) => {
     );
 };
 
-// Meetings Section Component
+// Meetings Section Component (with scheduling)
 const MeetingsSection = ({ matchId, matchUser }) => {
     const { user } = useSelector((state) => state.auth);
     const [meetings, setMeetings] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        const fetchMeetings = async () => {
-            setLoading(true);
-            try {
-                const res = await axios.get('http://localhost:8000/api/v1/meets', {
-                    withCredentials: true,
+    // scheduler state
+    const [schedulerOpen, setSchedulerOpen] = useState(false);
+    const [meetType, setMeetType] = useState('online');
+    const [title, setTitle] = useState('');
+    const [date, setDate] = useState('');
+    const [time, setTime] = useState('');
+    const [duration, setDuration] = useState(30);
+    const [note, setNote] = useState('');
+    const [errors, setErrors] = useState(null);
+    const [confirmation, setConfirmation] = useState('');
+
+    const fetchMeetings = async () => {
+        setLoading(true);
+        try {
+            const res = await axios.get('http://localhost:8000/api/v1/meets', {
+                withCredentials: true,
+            });
+            if (res.data && res.data.success) {
+                // Filter meetings by match ID
+                const filteredMeetings = res.data.data.filter((meet) => {
+                    return String(meet.match) === String(matchId);
                 });
-                if (res.data && res.data.success) {
-                    // Filter meetings related to this match (partner or organizer)
-                    const filteredMeetings = res.data.data.filter((meet) => {
-                        const isOrganizerMatched = String(meet.organizer) === String(matchUser?._id);
-                        const isParticipantMatched = (meet.participants || []).some((p) =>
-                            String(p) === String(matchUser?._id)
-                        );
-                        return isOrganizerMatched || isParticipantMatched;
-                    });
 
-                    const mapped = filteredMeetings.map((m) => ({
-                        id: m._id,
-                        title: m.title,
-                        host: String(m.organizer) === String(user._id) ? 'You' : (m.organizerName || 'Host'),
-                        type: m.meetType === 'online' ? 'online' : 'inperson',
-                        date: new Date(m.dateAndTime).toISOString().slice(0, 10),
-                        time: new Date(m.dateAndTime).toTimeString().slice(0, 5),
-                        joinUrl: m.zoomJoinUrl || m.googleEventHtmlLink || null,
-                    }));
-                    setMeetings(mapped.sort((a, b) => (a.date + 'T' + a.time) > (b.date + 'T' + b.time) ? 1 : -1));
-                }
-            } catch (error) {
-                console.error('Error fetching meetings:', error);
-            } finally {
-                setLoading(false);
+                const mapped = filteredMeetings.map((m) => ({
+                    id: m._id,
+                    title: m.title || (m.meetType ? (m.meetType === 'online' ? 'Online Meeting' : 'In-Person Meeting') : 'Meeting'),
+                    host: String(m.organizer._id || m.organizer) === String(user._id) ? 'You' : (m.organizerName || 'Host'),
+                    type: m.meetType === 'online' ? 'online' : 'inperson',
+                    date: new Date(m.dateAndTime).toISOString().slice(0, 10),
+                    time: new Date(m.dateAndTime).toTimeString().slice(0, 5),
+                    joinUrl: m.zoomJoinUrl || m.googleEventHtmlLink || null,
+                }));
+                setMeetings(mapped.sort((a, b) => (a.date + 'T' + a.time) > (b.date + 'T' + b.time) ? 1 : -1));
             }
-        };
+        } catch (error) {
+            console.error('Error fetching meetings:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
+    useEffect(() => {
         fetchMeetings();
-    }, [matchUser, user._id]);
+    }, [matchId, user._id]);
 
     const handleJoin = (joinUrl) => {
         if (!joinUrl) return;
         window.open(joinUrl, '_blank', 'noopener,noreferrer');
+    };
+
+    const validateAndBuildPayload = () => {
+        setErrors(null);
+        if (!date || !time) {
+            setErrors('Please select date and time');
+            return null;
+        }
+        const payload = {
+            match_id: matchId,
+            type: meetType,
+            title: title || `${meetType === 'online' ? 'Online' : 'In-Person'} session with ${matchUser?.name}`,
+            date,
+            time,
+            duration,
+            note,
+            with: matchUser ? { id: matchUser._id, name: matchUser.name, email: matchUser.email } : null,
+        };
+        return payload;
+    };
+
+    const handleCreateMeeting = async (e) => {
+        e.preventDefault();
+        const payload = validateAndBuildPayload();
+        if (!payload) return;
+
+        try {
+            const res = await axios.post('http://localhost:8000/api/v1/meets', payload, { withCredentials: true });
+            if (res.data?.success) {
+                setConfirmation('Meeting scheduled successfully');
+                setSchedulerOpen(false);
+                // reset small form
+                setTitle(''); setDate(''); setTime(''); setDuration(30); setNote('');
+                // refresh meetings
+                await fetchMeetings();
+                setTimeout(() => setConfirmation(''), 5000);
+            } else {
+                throw new Error(res.data?.message || 'Failed to create meeting');
+            }
+        } catch (err) {
+            console.error('Create meeting failed', err);
+            setErrors(err.response?.data?.message || err.message || 'Failed to create meeting');
+        }
     };
 
     const meetingCardStyle = {
@@ -403,6 +453,41 @@ const MeetingsSection = ({ matchId, matchUser }) => {
 
     return (
         <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Meetings</h3>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    {confirmation && <div style={{ color: 'var(--accent-primary)', fontWeight: '600' }}>{confirmation}</div>}
+                    <button
+                        style={{ padding: '0.5rem 0.9rem', borderRadius: '8px', background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer' }}
+                        onClick={() => setSchedulerOpen((s) => !s)}
+                    >
+                        {schedulerOpen ? 'Cancel' : 'Schedule Meet'}
+                    </button>
+                </div>
+            </div>
+
+            {schedulerOpen && (
+                <form onSubmit={handleCreateMeeting} style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--background-primary)' }}>
+                    {errors && <div style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>{errors}</div>}
+                    <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                        <select value={meetType} onChange={(e) => setMeetType(e.target.value)} style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                            <option value="online">Online</option>
+                            <option value="inperson">In-Person</option>
+                        </select>
+                        <input placeholder="Title (optional)" value={title} onChange={(e) => setTitle(e.target.value)} style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }} />
+                        <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }} />
+                        <input type="number" min={5} value={duration} onChange={(e) => setDuration(Number(e.target.value))} style={{ width: '120px', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }} />
+                    </div>
+                    <textarea placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)', minHeight: '80px' }} />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                        <button type="submit" style={{ padding: '0.5rem 0.9rem', borderRadius: '6px', background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer' }}>Create</button>
+                    </div>
+                </form>
+            )}
+
             {loading ? (
                 <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
                     Loading meetings...
