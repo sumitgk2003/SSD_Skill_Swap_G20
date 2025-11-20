@@ -22,4 +22,14 @@ const matchSchema=new mongoose.Schema({
   timestamps:true
 });
 
+// Organizer and Google event id for calendar sync
+matchSchema.add({
+  organizer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  googleEventId: { type: String, default: null },
+  attendees: { type: [String], default: [] },
+  googleEventHtmlLink: { type: String, default: null },
+  zoomMeetingId: { type: String, default: null },
+  zoomJoinUrl: { type: String, default: null },
+});
+
 export const Meet=mongoose.model("Meet",matchSchema);

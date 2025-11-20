@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 
 // --- ChatWindow Component ---
-const ChatWindow = ({ user, onSendMessage, onOpenScheduler, confirmation }) => {
+const ChatWindow = ({ user, onSendMessage, onOpenScheduler, confirmation, calendarLink, zoomLink }) => {
   const [newMessage, setNewMessage] = useState('');
 
   const handleSubmit = (e) => {
@@ -50,6 +50,20 @@ const ChatWindow = ({ user, onSendMessage, onOpenScheduler, confirmation }) => {
       {confirmation && (
         <div style={styles.inlineConfirm}>
           {confirmation}
+          {calendarLink && (
+            <div style={{ marginTop: 6 }}>
+              <a href={calendarLink} target="_blank" rel="noopener noreferrer" style={{ color: '#065f46', fontWeight: 700, textDecoration: 'underline' }}>
+                Open in Google Calendar
+              </a>
+            </div>
+          )}
+          {zoomLink && (
+            <div style={{ marginTop: 6 }}>
+              <a href={zoomLink} target="_blank" rel="noopener noreferrer" style={{ color: '#0b5394', fontWeight: 700, textDecoration: 'underline' }}>
+                Join Zoom Meeting
+              </a>
+            </div>
+          )}
         </div>
       )}
 
@@ -99,6 +113,8 @@ const FindMatchesPage = () => {
   const [note, setNote] = useState('');
   const [errors, setErrors] = useState({});
   const [confirmation, setConfirmation] = useState('');
+  const [calendarLink, setCalendarLink] = useState(null);
+  const [zoomLink, setZoomLink] = useState(null);
 
   const firstFieldRef = useRef(null);
   const dateInputRef = useRef(null);
@@ -120,15 +136,16 @@ const FindMatchesPage = () => {
         try {
             const res = await axios.get('http://localhost:8000/api/v1/users/getConnected', { withCredentials: true });
             if (res.data.success) {
-                const formattedConnections = res.data.data.map(conn => ({
-                    id: conn._id, // Match ID
-                    userId: conn.partner._id,
-                    name: conn.partner.name,
-                    teaches: conn.skill_i_learn, // What they teach you
-                    learns: conn.skill_i_teach, // What they learn from you
-                    pic: `https://placehold.co/100x100/6a5acd/FFF?text=${conn.partner.name.charAt(0)}`,
-                    messages: [], // Initialize with empty messages
-                }));
+        const formattedConnections = res.data.data.map(conn => ({
+          id: conn._id, // Match ID
+          userId: conn.partner._id,
+          name: conn.partner.name,
+          email: conn.partner.email,
+          teaches: conn.skill_i_learn, // What they teach you
+          learns: conn.skill_i_teach, // What they learn from you
+          pic: `https://placehold.co/100x100/6a5acd/FFF?text=${conn.partner.name.charAt(0)}`,
+          messages: [], // Initialize with empty messages
+        }));
                 setMatches(formattedConnections);
             }
         } catch (error) {
@@ -228,12 +245,28 @@ const FindMatchesPage = () => {
       time,
       duration,
       note,
-      with: selectedUser ? { id: selectedUser.id, name: selectedUser.name } : null,
+      with: selectedUser ? { id: selectedUser.userId, name: selectedUser.name, email: selectedUser.email } : null,
     };
-    console.log('Create meeting payload:', payload);
-    setConfirmation(`Meeting scheduled ${meetType} ${date} ${time} for ${duration} minutes${selectedUser ? ' with ' + selectedUser.name : ''}.`);
-    setTimeout(() => setConfirmation(''), 5000);
-    setSchedulerOpen(false);
+
+    (async () => {
+      try {
+        const res = await axios.post('http://localhost:8000/api/v1/meets', payload, { withCredentials: true });
+        if (res.data?.success) {
+          const created = res.data.data;
+          const calendarStatus = created.googleEventId ? ' and added to your Google Calendar' : ' (not added to calendar)';
+            setConfirmation(`Meeting scheduled ${meetType} ${date} ${time} for ${duration} minutes${selectedUser ? ' with ' + selectedUser.name : ''}` + calendarStatus + '.');
+            setCalendarLink(created.googleEventHtmlLink || null);
+            setZoomLink(created.zoomJoinUrl || null);
+            setTimeout(() => { setConfirmation(''); setCalendarLink(null); setZoomLink(null); }, 6000);
+          setSchedulerOpen(false);
+        } else {
+          throw new Error(res.data?.message || 'Failed to create meeting');
+        }
+      } catch (err) {
+        console.error('Create meeting failed', err);
+        setErrors(prev => ({ ...prev, submit: err.response?.data?.message || err.message || 'Failed to create meeting' }));
+      }
+    })();
   };
 
   const selectedChatUser = matches.find(u => u.id === selectedUser?.id) || null;
@@ -278,11 +311,13 @@ const FindMatchesPage = () => {
       {/* Right Column: Chat Window */}
       <div style={styles.chatContainer}>
         <ChatWindow 
-          user={selectedChatUser} 
-          onSendMessage={handleSendMessage}
-          onOpenScheduler={openScheduler}
-          confirmation={confirmation}
-        />
+            user={selectedChatUser} 
+            onSendMessage={handleSendMessage}
+            onOpenScheduler={openScheduler}
+            confirmation={confirmation}
+            calendarLink={calendarLink}
+            zoomLink={zoomLink}
+          />
       </div>
 
       {/* Scheduler Modal */}
@@ -294,6 +329,8 @@ const FindMatchesPage = () => {
                 <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Schedule meeting</h3>
                 <button type="button" onClick={closeScheduler} style={styles.closeBtnModal} aria-label="Close form">✕</button>
               </div>
+
+              {errors.submit && <div style={{ marginBottom: 8 }}><div style={styles.errorStyle}>{errors.submit}</div></div>}
 
               <div style={{ marginTop: 8 }}>
                 <div style={styles.label}>Meeting type</div>
