@@ -44,9 +44,15 @@ const styles = {
     display: 'flex',
     gap: '1rem',
     marginBottom: '1rem',
+    alignItems: 'flex-start',
+  },
+  inputWrapper: {
+    position: 'relative',
+    flexGrow: 1,
   },
   input: {
-    flexGrow: 1,
+    width: '100%',
+    boxSizing: 'border-box',
     padding: '0.8rem 1rem',
     border: '1px solid var(--border-color)',
     borderRadius: '8px',
@@ -54,6 +60,32 @@ const styles = {
     backgroundColor: 'var(--background-secondary)',
     color: 'var(--text-primary)',
     outline: 'none',
+  },
+  // Updated Dropdown Styles for visibility
+  suggestionsList: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: 'var(--background-primary)', // Uses theme color
+    border: '1px solid var(--border-color)',
+    borderRadius: '8px',
+    marginTop: '5px',
+    maxHeight: '200px',
+    overflowY: 'auto',
+    zIndex: 1000,
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    listStyle: 'none',
+    padding: 0,
+    margin: 0,
+  },
+  suggestionItem: {
+    padding: '0.8rem 1rem',
+    cursor: 'pointer',
+    borderBottom: '1px solid var(--border-color)',
+    color: 'var(--text-primary)',
+    transition: 'background-color 0.2s',
+    display: 'block',
   },
   textarea: {
     width: '100%',
@@ -76,6 +108,7 @@ const styles = {
     color: 'white',
     fontWeight: 'bold',
     cursor: 'pointer',
+    height: '46px',
   },
   skillTagContainer: {
     display: 'flex',
@@ -132,38 +165,127 @@ const CreateProfilePage = () => {
   const userSkills = useSelector((state) => state.auth.skills);
   const userInterests = useSelector((state) => state.auth.interests);
   const userBio = useSelector((state) => state.auth.bio);
+  
   const [bio, setLocalBio] = useState('');
+  
+  // Input states
   const [teachingSkillInput, setTeachingSkillInput] = useState('');
   const [learningSkillInput, setLearningSkillInput] = useState('');
+  
+  // Active lists (User's selected skills)
   const [currentTeachingSkills, setCurrentTeachingSkills] = useState([]);
   const [currentLearningSkills, setCurrentLearningSkills] = useState([]);
+  
+  // Data for suggestions
+  const [allSkills, setAllSkills] = useState([]); 
+  const [teachSuggestions, setTeachSuggestions] = useState([]);
+  const [learnSuggestions, setLearnSuggestions] = useState([]);
+  
   const [showSaveMessage, setShowSaveMessage] = useState(false);
 
+  // 1. Fetch all skills on load
+  useEffect(() => {
+    const fetchAllSkills = async () => {
+      try {
+        const res = await axios.get('http://localhost:8000/api/v1/users/getAllSkills', {
+          withCredentials: true 
+        });
+
+        console.log("Raw Skills Response:", res.data);
+
+        // PARSING LOGIC based on your Backend Code:
+        // Backend returns: new ApiResponse(200, flattenedUniqueArray, "...")
+        // Axios puts that inside res.data. 
+        // So the array is at res.data.data
+        let fetchedSkills = [];
+        
+        if (res.data && Array.isArray(res.data.data)) {
+            fetchedSkills = res.data.data;
+        } else if (Array.isArray(res.data)) {
+            // Fallback if ApiResponse is not used/configured differently
+            fetchedSkills = res.data;
+        }
+
+        // Sanitize: Ensure all items are strings
+        const cleanSkills = fetchedSkills
+            .filter(item => typeof item === 'string')
+            .map(item => item.trim());
+
+        setAllSkills(cleanSkills);
+        console.log("Skills loaded:", cleanSkills.length);
+
+      } catch (error) {
+        console.error("Error fetching skills list:", error);
+      }
+    };
+    fetchAllSkills();
+  }, []);
+
+  // Initialize local state from Redux
   useEffect(() => {
     setLocalBio(userBio || '');
     setCurrentTeachingSkills(userSkills || []);
     setCurrentLearningSkills(userInterests || []);
   }, [userSkills, userInterests, userBio]);
 
-  const addSkill = (type) => {
-    if (type === 'teach' && teachingSkillInput && !currentTeachingSkills.includes(teachingSkillInput.toLowerCase())) {
-      const newSkills = [...currentTeachingSkills, teachingSkillInput.toLowerCase()];
-      setCurrentTeachingSkills(newSkills);
-      setTeachingSkillInput('');
-    } else if (type === 'learn' && learningSkillInput && !currentLearningSkills.includes(learningSkillInput.toLowerCase())) {
-      const newInterests = [...currentLearningSkills, learningSkillInput.toLowerCase()];
-      setCurrentLearningSkills(newInterests);
-      setLearningSkillInput('');
+  // 2. Filtering Logic
+  const getSuggestions = (inputValue) => {
+    if (!inputValue || inputValue.trim() === '') return [];
+    
+    const lowerInput = inputValue.toLowerCase();
+    
+    // Filter the master list
+    return allSkills.filter(skill => 
+      skill.toLowerCase().startsWith(lowerInput)
+    ).slice(0, 10); // Limit to top 10 matches to avoid huge lists
+  };
+
+  // 3. Handlers
+  const handleTeachInputChange = (e) => {
+    const val = e.target.value;
+    setTeachingSkillInput(val);
+    setTeachSuggestions(getSuggestions(val));
+  };
+
+  const handleLearnInputChange = (e) => {
+    const val = e.target.value;
+    setLearningSkillInput(val);
+    setLearnSuggestions(getSuggestions(val));
+  };
+
+  const selectSuggestion = (skill, type) => {
+    if (type === 'teach') {
+      setTeachingSkillInput(skill);
+      setTeachSuggestions([]); // Hide dropdown
+    } else {
+      setLearningSkillInput(skill);
+      setLearnSuggestions([]); // Hide dropdown
     }
   };
-  
+
+  const addSkill = (type) => {
+    if (type === 'teach') {
+        if (teachingSkillInput && !currentTeachingSkills.includes(teachingSkillInput.toLowerCase())) {
+            const newSkills = [...currentTeachingSkills, teachingSkillInput.toLowerCase()];
+            setCurrentTeachingSkills(newSkills);
+            setTeachingSkillInput('');
+            setTeachSuggestions([]);
+        }
+    } else if (type === 'learn') {
+        if (learningSkillInput && !currentLearningSkills.includes(learningSkillInput.toLowerCase())) {
+            const newInterests = [...currentLearningSkills, learningSkillInput.toLowerCase()];
+            setCurrentLearningSkills(newInterests);
+            setLearningSkillInput('');
+            setLearnSuggestions([]);
+        }
+    }
+  };
+   
   const removeSkill = (skillToRemove, type) => {
       if (type === 'teach') {
-          const newSkills = currentTeachingSkills.filter(skill => skill !== skillToRemove);
-          setCurrentTeachingSkills(newSkills);
+          setCurrentTeachingSkills(currentTeachingSkills.filter(skill => skill !== skillToRemove));
       } else {
-          const newInterests = currentLearningSkills.filter(skill => skill !== skillToRemove);
-          setCurrentLearningSkills(newInterests);
+          setCurrentLearningSkills(currentLearningSkills.filter(skill => skill !== skillToRemove));
       }
   };
 
@@ -176,12 +298,9 @@ const CreateProfilePage = () => {
           skills: currentTeachingSkills,
           bio: bio,
         },
-        {
-          withCredentials: true,
-        }
+        { withCredentials: true }
       );
       if (res.data.success) {
-        console.log("Profile update successful:", res);
         dispatch(setSkills(currentTeachingSkills));
         dispatch(setInterests(currentLearningSkills));
         dispatch(setBio(bio));
@@ -191,9 +310,7 @@ const CreateProfilePage = () => {
     }
     
     setShowSaveMessage(true);
-    setTimeout(() => {
-      setShowSaveMessage(false);
-    }, 3000);
+    setTimeout(() => setShowSaveMessage(false), 3000);
   };
 
   return (
@@ -211,10 +328,35 @@ const CreateProfilePage = () => {
           />
         </div>
 
+        {/* TEACHING SKILLS SECTION */}
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>Skills You Can Teach</h2>
           <div style={styles.inputGroup}>
-            <input type="text" value={teachingSkillInput} onChange={(e) => setTeachingSkillInput(e.target.value)} placeholder="e.g., Python Programming" style={styles.input} />
+            <div style={styles.inputWrapper}>
+              <input 
+                type="text" 
+                value={teachingSkillInput} 
+                onChange={handleTeachInputChange} 
+                placeholder="e.g., Python Programming" 
+                style={styles.input} 
+                autoComplete="off"
+              />
+              {teachSuggestions.length > 0 && (
+                <ul style={styles.suggestionsList}>
+                  {teachSuggestions.map((skill, index) => (
+                    <li 
+                      key={index} 
+                      style={styles.suggestionItem}
+                      onMouseDown={() => selectSuggestion(skill, 'teach')} // onMouseDown fires before onBlur
+                      onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--accent-primary-light)'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                    >
+                      {skill}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <button onClick={() => addSkill('teach')} style={styles.button}>Add</button>
           </div>
           <div style={styles.skillTagContainer}>
@@ -227,10 +369,35 @@ const CreateProfilePage = () => {
           </div>
         </div>
 
+        {/* LEARNING SKILLS SECTION */}
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>Skills You Want To Learn</h2>
           <div style={styles.inputGroup}>
-            <input type="text" value={learningSkillInput} onChange={(e) => setLearningSkillInput(e.target.value)} placeholder="e.g., Play Guitar" style={styles.input} />
+             <div style={styles.inputWrapper}>
+                <input 
+                  type="text" 
+                  value={learningSkillInput} 
+                  onChange={handleLearnInputChange} 
+                  placeholder="e.g., Play Guitar" 
+                  style={styles.input} 
+                  autoComplete="off"
+                />
+                {learnSuggestions.length > 0 && (
+                  <ul style={styles.suggestionsList}>
+                    {learnSuggestions.map((skill, index) => (
+                      <li 
+                        key={index} 
+                        style={styles.suggestionItem}
+                        onMouseDown={() => selectSuggestion(skill, 'learn')}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--accent-primary-light)'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                      >
+                        {skill}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+            </div>
             <button onClick={() => addSkill('learn')} style={styles.button}>Add</button>
           </div>
           <div style={styles.skillTagContainer}>
