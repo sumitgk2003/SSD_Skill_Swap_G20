@@ -10,7 +10,8 @@ const pillColors = [
 ];
 
 // User Card Component
-const UserCard = ({ user, interest, onConnect, connectionStatus }) => {
+const UserCard = ({ user, onConnect, connectionStatus }) => {
+    const interest = user.matchedInterest;
     const pillColor = pillColors[user.user_id.charCodeAt(0) % pillColors.length];
 
     const cardStyle = {
@@ -93,19 +94,10 @@ const BrowseSkillsPage = () => {
   const [requestedUsers, setRequestedUsers] = useState(new Set());
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(false);
-
   const [activeInterest, setActiveInterest] = useState('All');
   const interestsForFilter = useMemo(() => ['All', ...userInterests], [userInterests]);
   
-  useEffect(() => {
-    if (activeInterest && activeInterest !== 'All') {
-      fetchMatches(activeInterest);
-    } else {
-      setMatches([]);
-    }
-  }, [activeInterest]);
-
-  const fetchMatches = async (interest) => {
+  const fetchMatchesForInterest = async (interest) => {
     setLoading(true);
     try {
       const res = await axios.post(
@@ -114,15 +106,66 @@ const BrowseSkillsPage = () => {
         { withCredentials: true }
       );
       if (res.data.success) {
-        setMatches(res.data.data);
+        const matchesWithInterest = res.data.data.map(match => ({ ...match, matchedInterest: interest }));
+        setMatches(matchesWithInterest);
+      } else {
+        setMatches([]);
       }
     } catch (error) {
-      console.error("Error fetching matches:", error);
+      console.error(`Error fetching matches for ${interest}:`, error);
       setMatches([]);
     } finally {
       setLoading(false);
     }
   };
+
+  const fetchAllMatches = async () => {
+    if (!userInterests || userInterests.length === 0) {
+      setMatches([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const allMatchesPromises = userInterests.map(interest =>
+        axios.post(
+          'http://localhost:8000/api/v1/users/getMatches',
+          { interest },
+          { withCredentials: true }
+        ).then(res => {
+          if (res.data.success) {
+            return res.data.data.map(match => ({ ...match, matchedInterest: interest }));
+          }
+          return [];
+        })
+      );
+
+      const results = await Promise.all(allMatchesPromises);
+      const flattenedMatches = results.flat();
+
+      const uniqueMatches = new Map();
+      flattenedMatches.forEach(match => {
+        if (!uniqueMatches.has(match.user_id)) {
+          uniqueMatches.set(match.user_id, match);
+        }
+      });
+
+      setMatches(Array.from(uniqueMatches.values()));
+    } catch (error) {
+      console.error("Error fetching all matches:", error);
+      setMatches([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeInterest === 'All') {
+      fetchAllMatches();
+    } else if (activeInterest) {
+      fetchMatchesForInterest(activeInterest);
+    }
+  }, [activeInterest, userInterests]);
+
 
   const handleConnect = async (userToConnect) => {
     if (!userToConnect.skills_they_want || userToConnect.skills_they_want.length === 0) {
@@ -135,8 +178,8 @@ const BrowseSkillsPage = () => {
             'http://localhost:8000/api/v1/users/sendRequest',
             {
                 recipientId: userToConnect.user_id,
-                learnSkill: activeInterest, // Skill you want to learn
-                teachSkill: userToConnect.skills_they_want[0], // Skill they want to learn from you
+                learnSkill: userToConnect.matchedInterest,
+                teachSkill: userToConnect.skills_they_want[0],
             },
             { withCredentials: true }
         );
@@ -226,15 +269,19 @@ const BrowseSkillsPage = () => {
                 <UserCard 
                     key={user.user_id} 
                     user={user}
-                    interest={activeInterest}
                     onConnect={handleConnect}
                     connectionStatus={getConnectionStatus(user.user_id)}
                 />
               ))}
             </div>
         )}
-        {activeInterest !== 'All' && !loading && matches.length === 0 && <p>No reciprocal matches found for "{activeInterest}". Try another skill!</p>}
-        {activeInterest === 'All' && <p>Select an interest you want to learn to find potential matches.</p>}
+        {!loading && matches.length === 0 && (
+          <p>
+            {activeInterest === 'All'
+              ? 'No potential matches found across all your interests.'
+              : `No reciprocal matches found for "${activeInterest}". Try another skill!`}
+          </p>
+        )}
       </div>
     </div>
   );
