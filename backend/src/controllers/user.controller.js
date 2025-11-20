@@ -147,6 +147,9 @@ const updateProfile = asyncHandler(async (req, res) => {
   // Convert skills to lowercase before validation and saving
   const lowerCaseSkills = Array.isArray(skills) ? skills.map(skill => skill.toLowerCase()) : [];
 
+  // Convert interests to lowercase before validation and saving
+  const lowerCaseInterests = Array.isArray(interests) ? interests.map(interest => interest.toLowerCase()) : [];
+
   if (!Array.isArray(skills)) {
     throw new ApiError(400, "Skills must be an array");
   } 
