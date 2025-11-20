@@ -1,9 +1,10 @@
 import dotenv from "dotenv";
-import connectDB from "./db/index.js";
-import { server } from "./app.js";
+// Load environment variables before importing other modules
 dotenv.config({
   path: "src/.env",
 });
+import connectDB from "./db/index.js";
+import { server } from "./app.js";
 
 connectDB()
   .then(() => {

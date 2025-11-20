@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import GoogleLoginButton from '../components/GoogleLoginButton';
 
 const SignUpPage = () => {
   const navigate = useNavigate();
@@ -121,6 +122,7 @@ const SignUpPage = () => {
             Sign Up
           </button>
         </form>
+        <GoogleLoginButton />
         <p style={bottomTextStyle}>
           Already have an account? <Link to="/login" style={linkStyle}>Log In</Link>
         </p>

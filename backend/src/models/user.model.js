@@ -38,6 +38,28 @@ const userSchema = new mongoose.Schema(
     refreshToken: {
       type: String,
     },
+    // Google/OAuth fields
+    googleId: {
+      type: String,
+      index: true,
+      sparse: true,
+    },
+    avatar: {
+      type: String,
+      default: "",
+    },
+    googleAccessToken: {
+      type: String,
+      default: null,
+    },
+    googleRefreshToken: {
+      type: String,
+      default: null,
+    },
+    googleTokenExpiry: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );

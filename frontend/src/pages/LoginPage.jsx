@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
 import { setSkills, setUser,setInterests,setBio } from '../store/authSlice'; // Import setUser action
+import GoogleLoginButton from '../components/GoogleLoginButton';
 import axios from 'axios';
 
 const LoginPage = () => {
@@ -133,6 +134,7 @@ const LoginPage = () => {
             Log In
           </button>
         </form>
+        <GoogleLoginButton />
         <p style={bottomTextStyle}>
           Don't have an account? <Link to="/signup" style={linkStyle}>Sign Up</Link>
         </p>

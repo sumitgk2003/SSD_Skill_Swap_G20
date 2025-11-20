@@ -5,6 +5,7 @@ import Header from './components/Header';
 import HomePage from './pages/HomePage';
 import BrowseSkillsPage from './pages/BrowseSkillsPage';
 import LoginPage from './pages/LoginPage';
+import AuthSuccess from './pages/AuthSuccess';
 import SignUpPage from './pages/SignUpPage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
@@ -50,6 +51,7 @@ const App = () => {
         <Route index element={<HomePage />} />
         <Route path="browse" element={<BrowseSkillsPage />} />
         <Route path="login" element={<LoginPage />} />
+        <Route path="auth/success" element={<AuthSuccess />} />
         <Route path="signup" element={<SignUpPage />} />
         <Route path="schedule" element={<MeetsListPage/>} />
         <Route path="admin" element={<AdminLoginPage />} />

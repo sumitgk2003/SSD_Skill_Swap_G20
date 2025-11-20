@@ -9,6 +9,12 @@ export const options = {
   secure: true,
 };
 
+const getCurrentUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select("-password -refreshToken -googleRefreshToken");
+  if (!user) throw new ApiError(404, "User not found");
+  return res.status(200).json(new ApiResponse(200, { user }, "Current user fetched"));
+});
+
 export const generateAccessAndRefreshTokens = async (UserId) => {
   try {
     const user = await User.findById(UserId);
@@ -403,3 +409,4 @@ export {
   getConnectedUsers,
   respondRequest
 };
+export { getCurrentUser };
