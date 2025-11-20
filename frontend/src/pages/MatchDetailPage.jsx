@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
+import { io } from 'socket.io-client';
 
 // Message Component with Enhanced UI - Theme Aware
 const MessageBubble = ({ message, isOwn, senderName }) => {
@@ -74,6 +75,7 @@ const ChatSection = ({ matchId, matchUser, skillTitle }) => {
     const [messageInput, setMessageInput] = useState('');
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef(null);
+    const socketRef = useRef(null);
 
     // Auto-scroll to latest message
     const scrollToBottom = () => {
@@ -109,6 +111,51 @@ const ChatSection = ({ matchId, matchUser, skillTitle }) => {
 
         fetchMessages();
     }, [matchId]);
+
+    // Socket: connect and listen for incoming messages
+    useEffect(() => {
+        if (!user) return; // wait for user
+
+        try {
+            const userId = user?.id || user?._id;
+            const socket = io('http://localhost:8000', {
+                query: { userId },
+                withCredentials: true,
+            });
+
+            socketRef.current = socket;
+
+            // Listen for new messages emitted by the server
+            socket.on('newMessage', (newMsg) => {
+                try {
+                    if (!newMsg) return;
+                    // Only append if the message belongs to the current match
+                    if (String(newMsg.matchId) === String(matchId)) {
+                        setMessages((prev) => [...prev, newMsg]);
+                    }
+                } catch (err) {
+                    console.error('Error handling newMessage socket event', err);
+                }
+            });
+
+            // optional: listen for online users list
+            socket.on('getOnlineUsers', (users) => {
+                // you can expose online status in UI if desired
+                // console.log('online users:', users);
+            });
+
+            return () => {
+                if (socketRef.current) {
+                    socketRef.current.off('newMessage');
+                    socketRef.current.off('getOnlineUsers');
+                    socketRef.current.disconnect();
+                    socketRef.current = null;
+                }
+            };
+        } catch (err) {
+            console.error('Socket connection failed', err);
+        }
+    }, [user, matchId]);
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
