@@ -146,12 +146,12 @@ const CreateProfilePage = () => {
   }, [userSkills, userInterests, userBio]);
 
   const addSkill = (type) => {
-    if (type === 'teach' && teachingSkillInput && !currentTeachingSkills.includes(teachingSkillInput)) {
-      const newSkills = [...currentTeachingSkills, teachingSkillInput];
+    if (type === 'teach' && teachingSkillInput && !currentTeachingSkills.includes(teachingSkillInput.toLowerCase())) {
+      const newSkills = [...currentTeachingSkills, teachingSkillInput.toLowerCase()];
       setCurrentTeachingSkills(newSkills);
       setTeachingSkillInput('');
-    } else if (type === 'learn' && learningSkillInput && !currentLearningSkills.includes(learningSkillInput)) {
-      const newInterests = [...currentLearningSkills, learningSkillInput];
+    } else if (type === 'learn' && learningSkillInput && !currentLearningSkills.includes(learningSkillInput.toLowerCase())) {
+      const newInterests = [...currentLearningSkills, learningSkillInput.toLowerCase()];
       setCurrentLearningSkills(newInterests);
       setLearningSkillInput('');
     }

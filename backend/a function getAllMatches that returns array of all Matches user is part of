@@ -440,44 +440,6 @@ const getAllSkills = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, flattenedUniqueArray, "All unique skills and interests fetched successfully"));
 });
 
-// New function to get all matches for the current user
-const getAllConnections = asyncHandler(async (req, res) => {
-  const userId = req.user._id;
-
-  // Find all matches where the current user is either user1 or user2
-  const matches = await Match.find({
-    $or: [{ user1: userId }, { user2: userId }],
-  })
-  .populate("user1", "name email") // Populate details for user1
-  .populate("user2", "name email"); // Populate details for user2
-
-  // Format the matches to be more readable
-  const formattedMatches = matches.map((match) => {
-    const isCurrentUser1 = match.user1._id.toString() === userId.toString();
-    const partner = isCurrentUser1 ? match.user2 : match.user1;
-    const currentUserSkill = isCurrentUser1 ? match.skill1 : match.skill2;
-    const partnerSkill = isCurrentUser1 ? match.skill2 : match.skill1;
-
-    return {
-      _id: match._id,
-      partner: {
-        _id: partner._id,
-        name: partner.name,
-        email: partner.email,
-      },
-      status: match.status,
-      skill_i_teach: currentUserSkill, // Skill the current user is teaching in this match
-      skill_i_learn: partnerSkill,     // Skill the current user is learning in this match
-      created_at: match.createdAt,
-      updated_at: match.updatedAt,
-    };
-  });
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, formattedMatches, "All matches fetched successfully"));
-});
-
 
 export {
   registerUser,
@@ -489,7 +451,6 @@ export {
   getPendingRequests,
   getConnectedUsers,
   respondRequest,
-  getAllSkills, // Export the new function
-  getAllConnections // Export the new function
+  getAllSkills // Export the new function
 };
 export { getCurrentUser };
