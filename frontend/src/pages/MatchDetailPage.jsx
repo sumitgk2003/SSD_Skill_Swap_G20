@@ -67,10 +67,9 @@ const MessageBubble = ({ message, isOwn, senderName }) => {
     );
 };
 
-// Chat Section Component
-const ChatSection = ({ skillId, skillTitle, matchedUsers }) => {
+// Chat Section Component - Single Match (No User List)
+const ChatSection = ({ matchId, matchUser, skillTitle }) => {
     const { user } = useSelector((state) => state.auth);
-    const [selectedUser, setSelectedUser] = useState(null);
     const [messages, setMessages] = useState([]);
     const [messageInput, setMessageInput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -85,16 +84,16 @@ const ChatSection = ({ skillId, skillTitle, matchedUsers }) => {
         scrollToBottom();
     }, [messages]);
 
-    // Fetch messages for selected user
+    // Fetch messages for match
     useEffect(() => {
-        if (!selectedUser) return;
+        if (!matchId) return;
 
         const fetchMessages = async () => {
             setLoading(true);
             try {
                 const res = await axios.post(
                     'http://localhost:8000/api/v1/messages/get',
-                    { matchId: selectedUser.matchId },
+                    { matchId: matchId },
                     { withCredentials: true }
                 );
                 if (res.data) {
@@ -109,24 +108,23 @@ const ChatSection = ({ skillId, skillTitle, matchedUsers }) => {
         };
 
         fetchMessages();
-    }, [selectedUser]);
+    }, [matchId]);
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
-        if (!messageInput.trim() || !selectedUser) return;
+        if (!messageInput.trim() || !matchId) return;
 
         try {
             const res = await axios.post(
                 'http://localhost:8000/api/v1/messages/send',
                 {
-                    matchId: selectedUser.matchId,
+                    matchId: matchId,
                     text: messageInput,
                 },
                 { withCredentials: true }
             );
 
             if (res.data) {
-                // Add the new message to the messages list
                 setMessages([...messages, res.data]);
                 setMessageInput('');
             }
@@ -137,9 +135,8 @@ const ChatSection = ({ skillId, skillTitle, matchedUsers }) => {
     };
 
     const chatContainerStyle = {
-        display: 'grid',
-        gridTemplateColumns: '280px 1fr',
-        gap: '1.5rem',
+        display: 'flex',
+        flexDirection: 'column',
         height: '650px',
         borderRadius: '16px',
         overflow: 'hidden',
@@ -147,47 +144,13 @@ const ChatSection = ({ skillId, skillTitle, matchedUsers }) => {
         border: '1px solid var(--border-color)',
     };
 
-    const usersListStyle = {
-        backgroundColor: 'var(--background-primary)',
-        borderRight: '1px solid var(--border-color)',
-        overflowY: 'auto',
-        padding: '1.25rem 0',
-        display: 'flex',
-        flexDirection: 'column',
-    };
-
-    const usersListHeaderStyle = {
-        padding: '1rem 1.25rem',
-        fontWeight: 'bold',
-        color: 'var(--text-primary)',
-        fontSize: '0.95rem',
-        borderBottom: '1px solid var(--border-color)',
-        marginBottom: '0.5rem',
-    };
-
-    const userItemStyle = (isSelected) => ({
-        padding: '1rem 1.25rem',
-        cursor: 'pointer',
-        backgroundColor: isSelected ? 'var(--accent-primary-light)' : 'transparent',
-        color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
-        borderLeft: isSelected ? `4px solid var(--accent-primary)` : '4px solid transparent',
-        fontWeight: isSelected ? '600' : 'normal',
-        transition: 'all 0.2s ease',
-        borderRadius: '0 8px 8px 0',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.3rem',
-        '&:hover': {
-            backgroundColor: 'var(--background-secondary)',
-        },
-    });
-
     const messagesContainerStyle = {
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: 'var(--background-secondary)',
         overflow: 'hidden',
         padding: 0,
+        flex: 1,
     };
 
     const messagesViewStyle = {
@@ -231,155 +194,115 @@ const ChatSection = ({ skillId, skillTitle, matchedUsers }) => {
         fontWeight: '600',
         fontSize: '0.95rem',
         transition: 'all 0.3s ease',
-        boxShadow: '0 4px 12px rgba(var(--accent-primary-rgb), 0.3)',
+        boxShadow: '0 4px 12px rgba(89, 146, 241, 0.3)',
     };
 
     return (
         <div style={chatContainerStyle}>
-            <div style={usersListStyle}>
-                <div style={usersListHeaderStyle}>
-                    👥 Matched Users ({matchedUsers.length})
-                </div>
-                {matchedUsers.length === 0 ? (
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', padding: '1.25rem', textAlign: 'center' }}>
-                        No matched users yet
-                    </p>
-                ) : (
-                    matchedUsers.map((matchUser) => (
-                        <div
-                            key={matchUser._id}
-                            style={userItemStyle(selectedUser?._id === matchUser._id)}
-                            onClick={() => setSelectedUser(matchUser)}
-                        >
-                            <div style={{ fontWeight: '600', fontSize: '0.95rem' }}>{matchUser.name}</div>
-                            <div style={{ fontSize: '0.8rem', opacity: 0.65 }}>
-                                {matchUser.email}
-                            </div>
-                        </div>
-                    ))
-                )}
-            </div>
-
             <div style={messagesContainerStyle}>
-                {selectedUser ? (
-                    <>
-                        <div style={{ 
-                            borderBottom: '1px solid var(--border-color)', 
-                            padding: '1.25rem 1.5rem',
-                            backgroundColor: 'var(--background-primary)',
+                <>
+                    <div style={{ 
+                        borderBottom: '1px solid var(--border-color)', 
+                        padding: '1.25rem 1.5rem',
+                        backgroundColor: 'var(--background-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                    }}>
+                        <div style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '50%',
+                            backgroundColor: 'var(--accent-primary-light)',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.75rem',
+                            justifyContent: 'center',
+                            fontWeight: 'bold',
+                            color: 'var(--accent-primary)',
+                            fontSize: '1rem',
                         }}>
-                            <div style={{
-                                width: '40px',
-                                height: '40px',
-                                borderRadius: '50%',
-                                backgroundColor: 'var(--accent-primary-light)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: 'bold',
-                                color: 'var(--accent-primary)',
-                                fontSize: '1rem',
-                            }}>
-                                {selectedUser.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                                <h4 style={{ margin: 0, color: 'var(--text-primary)', fontWeight: '600' }}>
-                                    {selectedUser.name}
-                                </h4>
-                                <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                                    {selectedUser.email}
-                                </p>
-                            </div>
+                            {matchUser?.name?.charAt(0).toUpperCase()}
                         </div>
-
-                        {loading ? (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-                                <p style={{ color: 'var(--text-secondary)' }}>
-                                    Loading messages...
-                                </p>
-                            </div>
-                        ) : (
-                            <>
-                                <div style={messagesViewStyle}>
-                                    {messages.length === 0 ? (
-                                        <p style={{ color: 'var(--text-secondary)', textAlign: 'center' }}>
-                                            No messages yet. Start the conversation!
-                                        </p>
-                                    ) : (
-                                        messages.map((msg) => {
-                                            const isOwnMessage = String(msg.sendersId) === String(user?.id || user?._id);
-                                            return (
-                                                <MessageBubble
-                                                    key={msg._id}
-                                                    message={msg.text}
-                                                    isOwn={isOwnMessage}
-                                                    senderName={isOwnMessage ? 'You' : selectedUser.name}
-                                                />
-                                            );
-                                        })
-                                    )}
-                                    <div ref={messagesEndRef} />
-                                </div>
-
-                                <form style={formStyle} onSubmit={handleSendMessage}>
-                                    <input
-                                        type="text"
-                                        placeholder="Type a message..."
-                                        value={messageInput}
-                                        onChange={(e) => setMessageInput(e.target.value)}
-                                        style={inputStyle}
-                                        onFocus={(e) => {
-                                            e.target.style.borderColor = 'var(--accent-primary)';
-                                            e.target.style.boxShadow = '0 0 0 3px rgba(89, 146, 241, 0.1)';
-                                        }}
-                                        onBlur={(e) => {
-                                            e.target.style.borderColor = 'var(--border-color)';
-                                            e.target.style.boxShadow = 'none';
-                                        }}
-                                    />
-                                    <button
-                                        type="submit"
-                                        style={sendBtnStyle}
-                                        onMouseEnter={(e) => {
-                                            e.target.style.transform = 'translateY(-2px)';
-                                            e.target.style.boxShadow = '0 6px 16px rgba(89, 146, 241, 0.4)';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.target.style.transform = 'translateY(0)';
-                                            e.target.style.boxShadow = '0 4px 12px rgba(89, 146, 241, 0.3)';
-                                        }}
-                                    >
-                                        📤 Send
-                                    </button>
-                                </form>
-                            </>
-                        )}
-                    </>
-                ) : (
-                    <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        height: '100%', 
-                        color: 'var(--text-secondary)',
-                        flexDirection: 'column',
-                        gap: '1rem',
-                    }}>
-                        <div style={{ fontSize: '3rem' }}>💬</div>
-                        <p style={{ fontWeight: '500', fontSize: '1.1rem' }}>No chat selected</p>
-                        <p style={{ fontSize: '0.9rem', opacity: 0.7 }}>Select a user to start chatting</p>
+                        <div>
+                            <h4 style={{ margin: 0, color: 'var(--text-primary)', fontWeight: '600' }}>
+                                {matchUser?.name}
+                            </h4>
+                            <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                {skillTitle}
+                            </p>
+                        </div>
                     </div>
-                )}
+
+                    {loading ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+                            <p style={{ color: 'var(--text-secondary)' }}>
+                                Loading messages...
+                            </p>
+                        </div>
+                    ) : (
+                        <>
+                            <div style={messagesViewStyle}>
+                                {messages.length === 0 ? (
+                                    <p style={{ color: 'var(--text-secondary)', textAlign: 'center' }}>
+                                        No messages yet. Start the conversation!
+                                    </p>
+                                ) : (
+                                    messages.map((msg) => {
+                                        const isOwnMessage = String(msg.sendersId) === String(user?.id || user?._id);
+                                        return (
+                                            <MessageBubble
+                                                key={msg._id}
+                                                message={msg.text}
+                                                isOwn={isOwnMessage}
+                                                senderName={isOwnMessage ? 'You' : matchUser?.name}
+                                            />
+                                        );
+                                    })
+                                )}
+                                <div ref={messagesEndRef} />
+                            </div>
+
+                            <form style={formStyle} onSubmit={handleSendMessage}>
+                                <input
+                                    type="text"
+                                    placeholder="Type a message..."
+                                    value={messageInput}
+                                    onChange={(e) => setMessageInput(e.target.value)}
+                                    style={inputStyle}
+                                    onFocus={(e) => {
+                                        e.target.style.borderColor = 'var(--accent-primary)';
+                                        e.target.style.boxShadow = '0 0 0 3px rgba(89, 146, 241, 0.1)';
+                                    }}
+                                    onBlur={(e) => {
+                                        e.target.style.borderColor = 'var(--border-color)';
+                                        e.target.style.boxShadow = 'none';
+                                    }}
+                                />
+                                <button
+                                    type="submit"
+                                    style={sendBtnStyle}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.transform = 'translateY(-2px)';
+                                        e.target.style.boxShadow = '0 6px 16px rgba(89, 146, 241, 0.4)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.transform = 'translateY(0)';
+                                        e.target.style.boxShadow = '0 4px 12px rgba(89, 146, 241, 0.3)';
+                                    }}
+                                >
+                                    📤 Send
+                                </button>
+                            </form>
+                        </>
+                    )}
+                </>
             </div>
         </div>
     );
 };
 
 // Meetings Section Component
-const MeetingsSection = ({ skillId, skillTitle, matchedUsers }) => {
+const MeetingsSection = ({ matchId, matchUser }) => {
     const { user } = useSelector((state) => state.auth);
     const [meetings, setMeetings] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -392,12 +315,11 @@ const MeetingsSection = ({ skillId, skillTitle, matchedUsers }) => {
                     withCredentials: true,
                 });
                 if (res.data && res.data.success) {
-                    // Filter meetings related to the matched users for this skill
-                    const matchedUserIds = matchedUsers.map((u) => u._id);
+                    // Filter meetings related to this match (partner or organizer)
                     const filteredMeetings = res.data.data.filter((meet) => {
-                        const isOrganizerMatched = matchedUserIds.includes(String(meet.organizer));
+                        const isOrganizerMatched = String(meet.organizer) === String(matchUser?._id);
                         const isParticipantMatched = (meet.participants || []).some((p) =>
-                            matchedUserIds.includes(String(p))
+                            String(p) === String(matchUser?._id)
                         );
                         return isOrganizerMatched || isParticipantMatched;
                     });
@@ -421,7 +343,7 @@ const MeetingsSection = ({ skillId, skillTitle, matchedUsers }) => {
         };
 
         fetchMeetings();
-    }, [matchedUsers, user._id]);
+    }, [matchUser, user._id]);
 
     const handleJoin = (joinUrl) => {
         if (!joinUrl) return;
@@ -479,12 +401,6 @@ const MeetingsSection = ({ skillId, skillTitle, matchedUsers }) => {
         whiteSpace: 'nowrap',
     };
 
-    const gridStyle = {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-        gap: '1.5rem',
-    };
-
     return (
         <div>
             {loading ? (
@@ -493,10 +409,10 @@ const MeetingsSection = ({ skillId, skillTitle, matchedUsers }) => {
                 </p>
             ) : meetings.length === 0 ? (
                 <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
-                    No scheduled meetings yet for this skill
+                    No scheduled meetings yet with this contact
                 </p>
             ) : (
-                <div style={gridStyle}>
+                <div>
                     {meetings.map((meeting) => (
                         <div key={meeting.id} style={meetingCardStyle}>
                             <div style={meetingInfoStyle}>
@@ -534,13 +450,12 @@ const MeetingsSection = ({ skillId, skillTitle, matchedUsers }) => {
     );
 };
 
-// Main SkillDetailPage Component
-const SkillDetailPage = () => {
-    const { skillId } = useParams();
+// Main MatchDetailPage Component
+const MatchDetailPage = () => {
+    const { matchId } = useParams();
     const navigate = useNavigate();
     const { user } = useSelector((state) => state.auth);
-    const [skill, setSkill] = useState(null);
-    const [matchedUsers, setMatchedUsers] = useState([]);
+    const [matchData, setMatchData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('chat');
 
@@ -586,109 +501,36 @@ const SkillDetailPage = () => {
     }, []);
 
     useEffect(() => {
-        const fetchSkillData = async () => {
+        const fetchMatchData = async () => {
             setLoading(true);
             try {
-                // Fetch user data to get their profile info
-                const userRes = await axios.get('http://localhost:8000/api/v1/users/me', {
-                    withCredentials: true,
-                });
+                // Fetch the specific match data
+                const connectionsRes = await axios.get(
+                    'http://localhost:8000/api/v1/users/getConnections',
+                    { withCredentials: true }
+                );
 
-                if (userRes.data.success) {
-                    const userData = userRes.data.data.user;
+                if (connectionsRes.data.success) {
+                    const allMatches = connectionsRes.data.data || [];
+                    const match = allMatches.find((m) => String(m._id) === String(matchId));
                     
-                    // Get the skill title from the skillId
-                    const skills = userData.skills || [];
-                    const interests = userData.interests || [];
-                    
-                    // Determine if this is a teaching or learning skill
-                    let foundSkillTitle = null;
-                    let foundSkillType = 'unknown';
-                    
-                    // Check if it's in teaching skills
-                    const teachingSkillTitle = skills.find((s) => s.toLowerCase().replace(/\s+/g, '_') === skillId);
-                    if (teachingSkillTitle) {
-                        foundSkillTitle = teachingSkillTitle;
-                        foundSkillType = 'teaching';
-                    }
-                    
-                    // Check if it's in learning skills (interests)
-                    const learningSkillTitle = interests.find((s) => s.toLowerCase().replace(/\s+/g, '_') === skillId);
-                    if (learningSkillTitle) {
-                        foundSkillTitle = learningSkillTitle;
-                        foundSkillType = 'learning';
-                    }
-                    
-                    if (foundSkillTitle) {
-                        setSkill({
-                            id: skillId,
-                            title: foundSkillTitle.charAt(0).toUpperCase() + foundSkillTitle.slice(1),
-                            category: foundSkillType === 'teaching' ? 'Skill' : 'Interest',
-                            type: foundSkillType,
-                        });
+                    if (match) {
+                        setMatchData(match);
                     } else {
-                        // Fallback: create a basic skill object from the skillId
-                        const displayTitle = skillId.replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                        setSkill({
-                            id: skillId,
-                            title: displayTitle,
-                            category: 'General',
-                            type: 'unknown',
-                        });
-                    }
-                    
-                    // Fetch all connections to filter by skill
-                    try {
-                        const connectionsRes = await axios.get(
-                            'http://localhost:8000/api/v1/users/getConnections',
-                            { withCredentials: true }
-                        );
-                        
-                        if (connectionsRes.data.success) {
-                            const allMatches = connectionsRes.data.data;
-                            
-                            // Filter matches based on the skill being viewed
-                            const skillMatches = allMatches.filter((match) => {
-                                // Normalize skill names for comparison
-                                const normalizeSkill = (s) => s.toLowerCase().replace(/\s+/g, '_');
-                                const matchTeachSkill = normalizeSkill(match.skill_i_teach || '');
-                                const matchLearnSkill = normalizeSkill(match.skill_i_learn || '');
-                                
-                                return matchTeachSkill === skillId || matchLearnSkill === skillId;
-                            });
-                            
-                            // Extract unique partners from matched connections
-                            const matched = skillMatches.map((match) => ({
-                                _id: String(match.partner._id),
-                                name: match.partner.name,
-                                email: match.partner.email,
-                                matchId: String(match._id),
-                            }));
-                            
-                            setMatchedUsers(matched);
-                        }
-                    } catch (error) {
-                        console.error('Error fetching connections:', error);
-                        setMatchedUsers([]);
+                        console.error('Match not found');
                     }
                 }
             } catch (error) {
-                console.error('Error fetching skill data:', error);
-                // Set a fallback skill object
-                const displayTitle = skillId.replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                setSkill({
-                    id: skillId,
-                    title: displayTitle,
-                    category: 'General',
-                    type: 'unknown',
-                });
+                console.error('Error fetching match data:', error);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchSkillData();
-    }, [skillId, user]);
+        if (matchId) {
+            fetchMatchData();
+        }
+    }, [matchId, user]);
 
     const pageStyle = {
         padding: '4rem 2rem',
@@ -698,7 +540,7 @@ const SkillDetailPage = () => {
     };
 
     const contentWrapperStyle = {
-        maxWidth: '1400px',
+        maxWidth: '1200px',
         margin: '0 auto',
     };
 
@@ -726,14 +568,14 @@ const SkillDetailPage = () => {
         flex: 1,
     };
 
-    const skillTitleStyle = {
+    const matchTitleStyle = {
         fontSize: '2.5rem',
         fontWeight: 'bold',
         margin: '0 0 0.5rem 0',
         color: 'var(--text-primary)',
     };
 
-    const skillSubtitleStyle = {
+    const matchSubtitleStyle = {
         fontSize: '1.1rem',
         color: 'var(--text-secondary)',
         margin: 0,
@@ -775,17 +617,19 @@ const SkillDetailPage = () => {
         );
     }
 
-    if (!skill) {
+    if (!matchData) {
         return (
             <div style={pageStyle}>
                 <div style={contentWrapperStyle}>
                     <p style={{ textAlign: 'center', fontSize: '1.2rem', color: 'var(--text-secondary)' }}>
-                        Skill not found
+                        Match not found
                     </p>
                 </div>
             </div>
         );
     }
+
+    const skillTitle = matchData.skill_i_teach || matchData.skill_i_learn || 'Unknown Skill';
 
     return (
         <div style={pageStyle}>
@@ -800,10 +644,9 @@ const SkillDetailPage = () => {
                         ← Back
                     </button>
                     <div style={titleStyle}>
-                        <h1 style={skillTitleStyle}>{skill.title}</h1>
-                        <p style={skillSubtitleStyle}>
-                            {skill.type === 'teaching' ? '📚 Teaching' : '🎓 Learning'} •{' '}
-                            {skill.category}
+                        <h1 style={matchTitleStyle}>{matchData.partner.name}</h1>
+                        <p style={matchSubtitleStyle}>
+                            {matchData.skill_i_teach ? '📚 Teaching' : '🎓 Learning'} • {skillTitle}
                         </p>
                     </div>
                 </div>
@@ -826,16 +669,15 @@ const SkillDetailPage = () => {
                 <div style={sectionStyle}>
                     {activeTab === 'chat' && (
                         <ChatSection
-                            skillId={skillId}
-                            skillTitle={skill.title}
-                            matchedUsers={matchedUsers}
+                            matchId={matchId}
+                            matchUser={matchData.partner}
+                            skillTitle={skillTitle}
                         />
                     )}
                     {activeTab === 'meetings' && (
                         <MeetingsSection
-                            skillId={skillId}
-                            skillTitle={skill.title}
-                            matchedUsers={matchedUsers}
+                            matchId={matchId}
+                            matchUser={matchData.partner}
                         />
                     )}
                 </div>
@@ -844,4 +686,4 @@ const SkillDetailPage = () => {
     );
 };
 
-export default SkillDetailPage;
+export default MatchDetailPage;
