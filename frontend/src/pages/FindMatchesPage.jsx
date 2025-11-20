@@ -340,7 +340,7 @@ const FindMatchesPage = () => {
                     <span style={{ marginLeft: 6 }}>Online</span>
                   </label>
                   <label style={styles.radioLabel}>
-                    <input type="radio" name="type" value="inperson" checked={meetType === 'inperson'} onChange={() => setMeetType('inperson')} />
+                    <input type="radio" name="type" value="in person" checked={meetType === 'in person'} onChange={() => setMeetType('in person')} />
                     <span style={{ marginLeft: 6 }}>In person</span>
                   </label>
                 </div>

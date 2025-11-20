@@ -57,6 +57,23 @@ export const createMeet = asyncHandler(async (req, res) => {
   return res.status(201).json(new ApiResponse(201, meet, 'Meet created'));
 });
 
+export const getMyMeets = asyncHandler(async (req, res) => {
+  // Return meets where the user is organizer or is an attendee (by email)
+  const user = await User.findById(req.user._id);
+  if (!user) throw new ApiError(404, 'User not found');
+
+  const meets = await Meet.find({
+    $or: [ { organizer: req.user._id }, { attendees: user.email } ]
+  }).sort({ dateAndTime: 1 }).populate('organizer', 'name email').lean();
+
+  // attach organizerName for frontend convenience
+  meets.forEach(m => {
+    if (m.organizer && m.organizer.name) m.organizerName = m.organizer.name;
+  });
+
+  return res.status(200).json(new ApiResponse(200, meets, 'User meets'));
+});
+
 export const deleteMeet = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const meet = await Meet.findById(id);
