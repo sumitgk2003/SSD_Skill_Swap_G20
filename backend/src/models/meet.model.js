@@ -14,6 +14,7 @@ const matchSchema=new mongoose.Schema({
     type:String,
     required:true
   },
+  match: { type: mongoose.Schema.Types.ObjectId, ref: 'Match' },
   durationInMinutes:{
     type:Number,
     required:true

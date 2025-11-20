@@ -7,7 +7,7 @@ import { createGoogleCalendarEvent, deleteGoogleCalendarEvent } from "../utils/g
 import { createZoomMeeting, deleteZoomMeeting } from "../utils/zoom.js";
 
 export const createMeet = asyncHandler(async (req, res) => {
-  const { type, date, time, duration, note, with: withUser } = req.body;
+  const { match_id, type, date, time, duration, note, with: withUser } = req.body;
   if (!date || !time || !duration) throw new ApiError(400, "Missing required fields");
 
   const dateTime = new Date(`${date}T${time}:00`);
@@ -17,6 +17,7 @@ export const createMeet = asyncHandler(async (req, res) => {
     meetType: type || 'online',
     dateAndTime: dateTime,
     title: note || (withUser ? `Meeting with ${withUser.name}` : 'Skill Swap Meeting'),
+    match: match_id,
     durationInMinutes: duration,
     organizer: req.user._id,
     attendees: withUser && withUser.email ? [withUser.email] : [],
