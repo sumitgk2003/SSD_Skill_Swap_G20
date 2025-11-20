@@ -365,7 +365,7 @@ const MeetingsSection = ({ matchId, matchUser }) => {
         }
         const payload = {
             match_id: matchId,
-            type: meetType,
+            type: meetType === 'inperson' ? 'in person' : 'online',
             title: title || `${meetType === 'online' ? 'Online' : 'In-Person'} session with ${matchUser?.name}`,
             date,
             time,
@@ -467,25 +467,33 @@ const MeetingsSection = ({ matchId, matchUser }) => {
             </div>
 
             {schedulerOpen && (
-                <form onSubmit={handleCreateMeeting} style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--background-primary)' }}>
+                <div style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid var(--border-color)', borderRadius: '12px', background: 'var(--background-primary)' }}>
                     {errors && <div style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>{errors}</div>}
-                    <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                        <select value={meetType} onChange={(e) => setMeetType(e.target.value)} style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                            <option value="online">Online</option>
-                            <option value="inperson">In-Person</option>
-                        </select>
-                        <input placeholder="Title (optional)" value={title} onChange={(e) => setTitle(e.target.value)} style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }} />
+
+                    {/* Header controls similar to MeetsListPage */}
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button type="button" onClick={() => setMeetType('online')} style={{ padding: '0.5rem 0.9rem', borderRadius: 10, border: meetType === 'online' ? 'none' : '1px solid var(--border-color)', background: meetType === 'online' ? 'var(--accent-primary)' : 'transparent', color: meetType === 'online' ? '#fff' : 'var(--text-primary)', fontWeight: 700, cursor: 'pointer' }}>Online</button>
+                            <button type="button" onClick={() => setMeetType('inperson')} style={{ padding: '0.5rem 0.9rem', borderRadius: 10, border: meetType === 'inperson' ? 'none' : '1px solid var(--border-color)', background: meetType === 'inperson' ? 'var(--accent-primary)' : 'transparent', color: meetType === 'inperson' ? '#fff' : 'var(--text-primary)', fontWeight: 700, cursor: 'pointer' }}>In person</button>
+                        </div>
+                        <input placeholder="Title (optional)" value={title} onChange={(e) => setTitle(e.target.value)} style={{ flex: 1, padding: '0.6rem', borderRadius: 10, border: '1px solid var(--border-color)', minWidth: 200 }} />
+                        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                            <button type="button" onClick={() => { setDate(''); setTime(''); setDuration(30); setTitle(''); setNote(''); }} style={{ padding: '0.45rem 0.75rem', borderRadius: 8, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)' }}>Reset</button>
+                        </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }} />
-                        <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }} />
-                        <input type="number" min={5} value={duration} onChange={(e) => setDuration(Number(e.target.value))} style={{ width: '120px', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }} />
+
+                    <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ padding: '0.6rem', borderRadius: 10, border: '1px solid var(--border-color)' }} />
+                        <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ padding: '0.6rem', borderRadius: 10, border: '1px solid var(--border-color)' }} />
+                        <input type="number" min={5} value={duration} onChange={(e) => setDuration(Number(e.target.value))} style={{ width: 140, padding: '0.6rem', borderRadius: 10, border: '1px solid var(--border-color)' }} />
                     </div>
-                    <textarea placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)', minHeight: '80px' }} />
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                        <button type="submit" style={{ padding: '0.5rem 0.9rem', borderRadius: '6px', background: 'var(--accent-primary)', color: '#fff', border: 'none', cursor: 'pointer' }}>Create</button>
+
+                    <textarea placeholder="Notes (optional)" value={note} onChange={(e) => setNote(e.target.value)} style={{ width: '100%', padding: '0.75rem', borderRadius: 10, border: '1px solid var(--border-color)', minHeight: 100 }} />
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                        <button onClick={handleCreateMeeting} style={{ padding: '0.75rem 1rem', borderRadius: 10, border: 'none', background: 'var(--accent-primary)', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>Create Meet</button>
                     </div>
-                </form>
+                </div>
             )}
 
             {loading ? (

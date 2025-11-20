@@ -240,7 +240,7 @@ const FindMatchesPage = () => {
     e.preventDefault();
     if (!validate()) return;
     const payload = {
-      type: meetType,
+      type: meetType === 'inperson' ? 'in person' : 'online',
       date,
       time,
       duration,
