@@ -1,48 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-
-// --- MOCK DATA ---
-const learningSkillsData = [
-  {
-    id: 'l1',
-    title: 'Advanced CSS Grid',
-    category: 'Web Development',
-    progress: 75,
-    nextSession: 'Tomorrow at 4:00 PM',
-  },
-  {
-    id: 'l2',
-    title: 'Introduction to Beekeeping',
-    category: 'Hobbies',
-    progress: 40,
-    nextSession: 'Nov 28, 2024 at 10:00 AM',
-  },
-  {
-    id: 'l3',
-    title: 'Data Structures in Python',
-    category: 'Programming',
-    progress: 90,
-    status: 'Completed!',
-  },
-];
-
-const teachingSkillsData = [
-  {
-    id: 't1',
-    title: 'Creative Writing',
-    category: 'Arts',
-    requests: 2,
-    upcoming: 5,
-  },
-  {
-    id: 't2',
-    title: 'React for Beginners',
-    category: 'Web Development',
-    requests: 0,
-    upcoming: 3,
-  },
-];
 
 const pillColors = [
     { bg: '#FDE68A', text: '#92400E' }, // Yellow
@@ -121,7 +80,7 @@ const RequestCard = ({ request, onAccept, onDecline }) => {
 
 
 // --- SkillCard Component ---
-const SkillCard = ({ skill, type }) => {
+const SkillCard = ({ skill, type, onSkillClick }) => {
     const [hovered, setHovered] = useState(false);
     const pillColor = pillColors[skill.id.charCodeAt(1) % pillColors.length];
 
@@ -175,6 +134,7 @@ const SkillCard = ({ skill, type }) => {
             style={cardStyle}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
+            onClick={() => onSkillClick(skill.id)}
         >
             <div>
                 <span style={pillStyle}>{skill.category}</span>
@@ -206,10 +166,51 @@ const SkillCard = ({ skill, type }) => {
 
 const DashboardPage = () => {
   const { user } = useSelector((state) => state.auth);
+  const navigate = useNavigate();
   const [incomingRequests, setIncomingRequests] = useState([]);
+  const [learningSkillsData, setLearningSkillsData] = useState([]);
+  const [teachingSkillsData, setTeachingSkillsData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch user's current profile including skills and interests
+        const userRes = await axios.get(
+          'http://localhost:8000/api/v1/users/me',
+          { withCredentials: true }
+        );
+
+        if (userRes.data.success) {
+          const userData = userRes.data.data.user;
+          const skills = userData.skills || [];
+          const interests = userData.interests || [];
+
+          // Convert skills and interests to skill objects with proper IDs
+          const learningSkills = interests.map((skill, index) => ({
+            id: skill.toLowerCase().replace(/\s+/g, '_'),
+            title: skill.charAt(0).toUpperCase() + skill.slice(1),
+            category: 'Interest',
+            progress: Math.floor(Math.random() * 100),
+            nextSession: 'Upcoming',
+          }));
+
+          const teachingSkills = skills.map((skill, index) => ({
+            id: skill.toLowerCase().replace(/\s+/g, '_'),
+            title: skill.charAt(0).toUpperCase() + skill.slice(1),
+            category: 'Skill',
+            requests: Math.floor(Math.random() * 5),
+            upcoming: Math.floor(Math.random() * 10),
+          }));
+
+          setLearningSkillsData(learningSkills);
+          setTeachingSkillsData(teachingSkills);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+    };
+
     const fetchRequests = async () => {
       try {
         const res = await axios.get(
@@ -226,8 +227,11 @@ const DashboardPage = () => {
       }
     };
 
-    fetchRequests();
-  }, []);
+    if (user) {
+      fetchData();
+      fetchRequests();
+    }
+  }, [user]);
 
   const respondToRequest = async (requestId, status) => {
     try {
@@ -249,6 +253,10 @@ const DashboardPage = () => {
   
   const handleDecline = (requestId) => {
     respondToRequest(requestId, 'rejected');
+  };
+
+  const handleSkillClick = (skillId) => {
+    navigate(`/skill/${skillId}`);
   };
 
   const pageStyle = {
@@ -319,7 +327,7 @@ const DashboardPage = () => {
           <h2 style={sectionHeaderStyle}>Skills You're Learning</h2>
           <div style={gridStyle}>
             {learningSkillsData.map(skill => (
-                <SkillCard key={skill.id} skill={skill} type="learning" />
+                <SkillCard key={skill.id} skill={skill} type="learning" onSkillClick={handleSkillClick} />
             ))}
           </div>
         </section>
@@ -328,7 +336,7 @@ const DashboardPage = () => {
           <h2 style={sectionHeaderStyle}>Skills You're Teaching</h2>
           <div style={gridStyle}>
              {teachingSkillsData.map(skill => (
-                <SkillCard key={skill.id} skill={skill} type="teaching" />
+                <SkillCard key={skill.id} skill={skill} type="teaching" onSkillClick={handleSkillClick} />
             ))}
           </div>
         </section>
