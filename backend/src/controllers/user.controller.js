@@ -183,16 +183,31 @@ const findMatches = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User not found");
   }
 
-  // 4. Run the Reciprocal Query
+  // 4. Get existing connections for the current user
+  const existingConnections = await Match.find({
+    $or: [{ user1: userId }, { user2: userId }],
+    status: "accepted",
+  });
+
+  const connectedUserIds = existingConnections.reduce((acc, match) => {
+    if (match.user1.toString() === userId.toString()) {
+      acc.add(match.user2.toString());
+    } else {
+      acc.add(match.user1.toString());
+    }
+    return acc;
+  }, new Set());
+
+  // 5. Run the Reciprocal Query
   const candidates = await User.find({
-    _id: { $ne: userId },                     // Exclude the user themselves
+    _id: { $ne: userId, $nin: Array.from(connectedUserIds) }, // Exclude the user themselves and already connected users
     skills: interest,                         // Filter 1: They teach what user wants
     interests: { $in: currentUser.skills }    // Filter 2: They want what user teaches
   })
   .select("name interests") 
   .lean();
 
-  // 5. Format the results
+  // 6. Format the results
   const matches = candidates.map((candidate) => {
     
     // Identify ALL skills of YOURS they are interested in
