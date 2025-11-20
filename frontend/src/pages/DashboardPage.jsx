@@ -79,6 +79,98 @@ const RequestCard = ({ request, onAccept, onDecline }) => {
 };
 
 
+// --- MatchCard Component ---
+const MatchCard = ({ match, type, onMatchClick }) => {
+    const [hovered, setHovered] = useState(false);
+    const pillColor = pillColors[match.partner.name.charCodeAt(0) % pillColors.length];
+
+    const cardStyle = {
+        backgroundColor: 'var(--background-secondary)',
+        borderRadius: '16px',
+        padding: '1.5rem',
+        border: '1px solid var(--border-color)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1rem',
+        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+        cursor: 'pointer',
+        textAlign: 'left',
+        transform: hovered ? 'translateY(-5px)' : 'none',
+        boxShadow: hovered ? '0 12px 24px rgba(0,0,0,0.15)' : 'var(--card-shadow)',
+    };
+
+    const avatarStyle = {
+        width: '50px',
+        height: '50px',
+        borderRadius: '50%',
+        backgroundColor: pillColor.bg,
+        color: pillColor.text,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '1.5rem',
+        fontWeight: 'bold',
+    };
+
+    const headerStyle = {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.75rem',
+        marginBottom: '0.5rem',
+    };
+
+    const pillStyle = {
+        display: 'inline-block',
+        padding: '0.25rem 0.75rem',
+        borderRadius: '9999px',
+        fontSize: '0.875rem',
+        fontWeight: 'bold',
+        backgroundColor: pillColor.bg,
+        color: pillColor.text,
+    };
+    
+    const titleStyle = { margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)', fontWeight: 'bold' };
+    const emailStyle = { margin: '0.25rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem' };
+    const skillStyle = { margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem' };
+    const statusStyle = { margin: '0.5rem 0 0 0', color: 'var(--accent-primary)', fontSize: '0.85rem', fontWeight: 'bold' };
+
+    return (
+        <div 
+            style={cardStyle}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            onClick={() => onMatchClick(match._id)}
+        >
+            <div style={headerStyle}>
+                <div style={avatarStyle}>{match.partner.name.charAt(0)}</div>
+                <div>
+                    <h3 style={titleStyle}>{match.partner.name}</h3>
+                    <p style={emailStyle}>{match.partner.email}</p>
+                </div>
+            </div>
+            
+            <div style={{ marginTop: '0.5rem' }}>
+                <span style={pillStyle}>{type === 'teaching' ? '📚 Teaching' : '🎓 Learning'}</span>
+            </div>
+
+            <div>
+                {type === 'teaching' ? (
+                    <p style={skillStyle}>
+                        <strong>Teaching:</strong> {match.skill_i_teach || 'N/A'}
+                    </p>
+                ) : (
+                    <p style={skillStyle}>
+                        <strong>Learning:</strong> {match.skill_i_learn || 'N/A'}
+                    </p>
+                )}
+                <p style={statusStyle}>
+                    Status: {match.status ? match.status.charAt(0).toUpperCase() + match.status.slice(1) : 'Active'}
+                </p>
+            </div>
+        </div>
+    );
+};
+
 // --- SkillCard Component ---
 const SkillCard = ({ skill, type, onSkillClick }) => {
     const [hovered, setHovered] = useState(false);
@@ -168,46 +260,36 @@ const DashboardPage = () => {
   const { user } = useSelector((state) => state.auth);
   const navigate = useNavigate();
   const [incomingRequests, setIncomingRequests] = useState([]);
-  const [learningSkillsData, setLearningSkillsData] = useState([]);
-  const [teachingSkillsData, setTeachingSkillsData] = useState([]);
+  const [learningMatches, setLearningMatches] = useState([]);
+  const [teachingMatches, setTeachingMatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch user's current profile including skills and interests
-        const userRes = await axios.get(
-          'http://localhost:8000/api/v1/users/me',
+        // Fetch all connections/matches
+        const connectionsRes = await axios.get(
+          'http://localhost:8000/api/v1/users/getConnections',
           { withCredentials: true }
         );
 
-        if (userRes.data.success) {
-          const userData = userRes.data.data.user;
-          const skills = userData.skills || [];
-          const interests = userData.interests || [];
-
-          // Convert skills and interests to skill objects with proper IDs
-          const learningSkills = interests.map((skill, index) => ({
-            id: skill.toLowerCase().replace(/\s+/g, '_'),
-            title: skill.charAt(0).toUpperCase() + skill.slice(1),
-            category: 'Interest',
-            progress: Math.floor(Math.random() * 100),
-            nextSession: 'Upcoming',
-          }));
-
-          const teachingSkills = skills.map((skill, index) => ({
-            id: skill.toLowerCase().replace(/\s+/g, '_'),
-            title: skill.charAt(0).toUpperCase() + skill.slice(1),
-            category: 'Skill',
-            requests: Math.floor(Math.random() * 5),
-            upcoming: Math.floor(Math.random() * 10),
-          }));
-
-          setLearningSkillsData(learningSkills);
-          setTeachingSkillsData(teachingSkills);
+        if (connectionsRes.data.success) {
+          const allMatches = connectionsRes.data.data || [];
+          
+          // Separate matches into learning and teaching
+          // Learning matches: where I want to LEARN (skill_i_learn)
+          const learning = allMatches.filter(match => match.skill_i_learn);
+          
+          // Teaching matches: where I TEACH (skill_i_teach)
+          const teaching = allMatches.filter(match => match.skill_i_teach);
+          
+          setLearningMatches(learning);
+          setTeachingMatches(teaching);
         }
       } catch (error) {
-        console.error('Error fetching user profile:', error);
+        console.error('Error fetching connections:', error);
+        setLearningMatches([]);
+        setTeachingMatches([]);
       }
     };
 
@@ -255,8 +337,8 @@ const DashboardPage = () => {
     respondToRequest(requestId, 'rejected');
   };
 
-  const handleSkillClick = (skillId) => {
-    navigate(`/skill/${skillId}`);
+  const handleSkillClick = (matchId) => {
+    navigate(`/match/${matchId}`);
   };
 
   const pageStyle = {
@@ -326,18 +408,30 @@ const DashboardPage = () => {
         <section>
           <h2 style={sectionHeaderStyle}>Skills You're Learning</h2>
           <div style={gridStyle}>
-            {learningSkillsData.map(skill => (
-                <SkillCard key={skill.id} skill={skill} type="learning" onSkillClick={handleSkillClick} />
-            ))}
+            {learningMatches.length === 0 ? (
+              <p style={{ color: 'var(--text-secondary)', gridColumn: '1 / -1' }}>
+                No matches yet for skills you're learning. Check back soon!
+              </p>
+            ) : (
+              learningMatches.map(match => (
+                <MatchCard key={match._id} match={match} type="learning" onMatchClick={handleSkillClick} />
+              ))
+            )}
           </div>
         </section>
 
         <section>
           <h2 style={sectionHeaderStyle}>Skills You're Teaching</h2>
           <div style={gridStyle}>
-             {teachingSkillsData.map(skill => (
-                <SkillCard key={skill.id} skill={skill} type="teaching" onSkillClick={handleSkillClick} />
-            ))}
+            {teachingMatches.length === 0 ? (
+              <p style={{ color: 'var(--text-secondary)', gridColumn: '1 / -1' }}>
+                No matches yet for skills you're teaching. Check back soon!
+              </p>
+            ) : (
+              teachingMatches.map(match => (
+                <MatchCard key={match._id} match={match} type="teaching" onMatchClick={handleSkillClick} />
+              ))
+            )}
           </div>
         </section>
       </div>
