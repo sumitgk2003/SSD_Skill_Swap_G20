@@ -138,6 +138,9 @@ const updateProfile = asyncHandler(async (req, res) => {
   if (!Array.isArray(interests)) {
     throw new ApiError(400, "Interests must be an array");
   }
+  // Convert skills to lowercase before validation and saving
+  const lowerCaseSkills = Array.isArray(skills) ? skills.map(skill => skill.toLowerCase()) : [];
+
   if (!Array.isArray(skills)) {
     throw new ApiError(400, "Skills must be an array");
   } 
@@ -147,12 +150,12 @@ const updateProfile = asyncHandler(async (req, res) => {
 
   console.log("Updating profile for user:", req.user._id);
   console.log("New interests:", interests);
-  console.log("New skills:", skills);
+  console.log("New skills:", lowerCaseSkills); // Log the lowercased skills
   console.log("New bio:", bio);
 
   const updatedUser = await User.findByIdAndUpdate(
     req.user._id,
-    { interests, skills, bio },
+    { interests, skills: lowerCaseSkills, bio }, // Use lowerCaseSkills here
     { new: true }
   ).select("-password -refreshToken");
 
