@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { createAdmin, populateAdminSkills, getAdmin, loginAdmin } from "../controllers/admin.controller.js";
 import { createAdmin, populateAdminSkills, getAdmin } from "../controllers/admin.controller.js";
 import { verifyJWT, requireAdmin } from "../middlewares/auth.middleware.js";
 
@@ -12,6 +13,8 @@ router.post("/create", createAdmin);
 router.post("/populate-skills", verifyJWT, requireAdmin, populateAdminSkills);
 
 // Get admin info (optional query ?email=)
+router.get("/", getAdmin);
+router.post("/login", loginAdmin);
 router.get("/", verifyJWT, requireAdmin, getAdmin);
 
 export default router;
