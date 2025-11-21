@@ -2,12 +2,13 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Meet } from "../models/meet.model.js";
+import { Session } from "../models/session.model.js";
 import { User } from "../models/user.model.js";
 import { createGoogleCalendarEvent, deleteGoogleCalendarEvent } from "../utils/googleCalendar.js";
 import { createZoomMeeting, deleteZoomMeeting } from "../utils/zoom.js";
 
 export const createMeet = asyncHandler(async (req, res) => {
-  const { match_id, type, date, time, duration, note, with: withUser } = req.body;
+  const { match_id, type, date, time, duration, note, with: withUser, role } = req.body;
   if (!date || !time || !duration) throw new ApiError(400, "Missing required fields");
 
   const dateTime = new Date(`${date}T${time}:00`);
@@ -55,7 +56,31 @@ export const createMeet = asyncHandler(async (req, res) => {
     }
   }
 
-  return res.status(201).json(new ApiResponse(201, meet, 'Meet created'));
+  // Optionally pre-create a Session if the scheduler specified a role and provided the other user's id
+  let createdSession = null;
+  try {
+    if (role && withUser && withUser.id) {
+      const other = await User.findById(withUser.id).select('_id');
+      if (other) {
+        const organizerId = req.user._id;
+        const tutorId = role === 'teach' ? organizerId : other._id;
+        const learnerId = role === 'teach' ? other._id : organizerId;
+        createdSession = await Session.create({
+          match: match_id || undefined,
+          meet: meet._id,
+          tutor: tutorId,
+          learner: learnerId,
+          date: dateTime,
+          durationInMinutes: duration,
+          completed: false,
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Failed to pre-create session for meeting:', err);
+  }
+
+  return res.status(201).json(new ApiResponse(201, { meet, session: createdSession }, 'Meet created'));
 });
 
 export const getMyMeets = asyncHandler(async (req, res) => {
