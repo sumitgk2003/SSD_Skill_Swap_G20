@@ -1093,6 +1093,12 @@ const MatchDetailPage = () => {
     const [matchData, setMatchData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('chat');
+    const [reviews, setReviews] = useState([]);
+    const [avgRating, setAvgRating] = useState(null);
+    const [reviewModalOpen, setReviewModalOpen] = useState(false);
+    const [reviewText, setReviewText] = useState('');
+    const [reviewRating, setReviewRating] = useState(5);
+    const [submittingReview, setSubmittingReview] = useState(false);
 
     // Add CSS animations
     useEffect(() => {
@@ -1151,6 +1157,9 @@ const MatchDetailPage = () => {
                     
                     if (match) {
                         setMatchData(match);
+                        // fetch reviews for partner when we have match
+                        fetchReviewsForUser(match.partner._id);
+                        fetchAvgForUser(match.partner._id);
                     } else {
                         console.error('Match not found');
                     }
@@ -1166,6 +1175,83 @@ const MatchDetailPage = () => {
             fetchMatchData();
         }
     }, [matchId, user]);
+
+    const fetchReviewsForUser = async (userId) => {
+        try {
+            const res = await axios.get(`http://localhost:8000/api/v1/reviews/${userId}`);
+            if (res.data && res.data.success) setReviews(res.data.data || []);
+        } catch (err) {
+            console.error('Error fetching reviews:', err);
+        }
+    };
+
+    const fetchAvgForUser = async (userId) => {
+        try {
+            const res = await axios.get(`http://localhost:8000/api/v1/reviews/${userId}/average`);
+            if (res.data && res.data.success) setAvgRating(res.data.data || null);
+        } catch (err) {
+            console.error('Error fetching avg rating:', err);
+        }
+    };
+
+    // Local styles used by the review modal
+    const styles = {
+        input: {
+            width: '100%',
+            padding: '0.6rem',
+            borderRadius: 8,
+            border: '1px solid var(--border-color)',
+            background: 'var(--background-primary)',
+            color: 'var(--text-primary)',
+            fontSize: '1rem',
+        },
+        textarea: {
+            width: '100%',
+            minHeight: 120,
+            padding: '0.6rem',
+            borderRadius: 8,
+            border: '1px solid var(--border-color)',
+            background: 'var(--background-primary)',
+            color: 'var(--text-primary)',
+            fontSize: '0.95rem',
+        },
+        button: {
+            padding: '0.5rem 0.9rem',
+            borderRadius: 8,
+            border: 'none',
+            background: 'var(--accent-primary)',
+            color: '#fff',
+            cursor: 'pointer',
+            fontWeight: 700,
+        }
+    };
+
+    const openReviewModal = () => {
+        setReviewText('');
+        setReviewRating(5);
+        setReviewModalOpen(true);
+    };
+
+    const submitReview = async () => {
+        if (!matchData) return;
+        setSubmittingReview(true);
+        try {
+            const payload = { toUserId: matchData.partner._id, rating: reviewRating, text: reviewText };
+            const res = await axios.post('http://localhost:8000/api/v1/reviews/', payload, { withCredentials: true });
+            if (res.data && res.data.success) {
+                setReviewModalOpen(false);
+                fetchReviewsForUser(matchData.partner._id);
+                fetchAvgForUser(matchData.partner._id);
+            } else {
+                alert('Failed to submit review');
+            }
+        } catch (err) {
+            console.error('Submit review failed', err);
+            alert(err.response?.data?.message || 'Failed to submit review');
+        } finally {
+            setSubmittingReview(false);
+        }
+    };
 
     const pageStyle = {
         padding: '4rem 2rem',
@@ -1282,6 +1368,12 @@ const MatchDetailPage = () => {
                         <p style={matchSubtitleStyle}>
                             {matchData.skill_i_teach ? '📚 Teaching' : '🎓 Learning'} • {skillTitle}
                         </p>
+                        <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                            <div style={{ color: 'var(--text-secondary)' }}>
+                                ⭐ {avgRating && avgRating.avg !== null ? `${avgRating.avg} (${avgRating.count})` : 'No ratings yet'}
+                            </div>
+                            <button onClick={openReviewModal} style={{ padding: '0.4rem 0.8rem', borderRadius: 8, border: 'none', backgroundColor: 'var(--accent-primary)', color: 'white', cursor: 'pointer' }}>Leave Review</button>
+                        </div>
                     </div>
                 </div>
 
