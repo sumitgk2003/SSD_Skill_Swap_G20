@@ -1,8 +1,8 @@
 import {Router} from "express";
 import {registerUser,loginUser,logoutUser,updateProfile,
 findMatches,sendRequest,getPendingRequests,getConnectedUsers,
-respondRequest,getAllSkills,getCurrentUser,getAllConnections
-} from "../controllers/user.controller.js";
+respondRequest,getAllSkills,getCurrentUser,getAllConnections,
+findPartialMatch} from "../controllers/user.controller.js";
 
 import {verifyJWT} from "../middlewares/auth.middleware.js";
 
@@ -24,5 +24,5 @@ router.route("/respondRequest").post(verifyJWT, respondRequest);
 router.route("/getConnected").get(verifyJWT, getConnectedUsers);
 router.route("/getAllSkills").get(verifyJWT, getAllSkills);
 router.route("/getConnections").get(verifyJWT, getAllConnections);
-
+router.route("/getPartialMatches").get(verifyJWT, findPartialMatch);
 export default router;

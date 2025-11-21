@@ -256,6 +256,61 @@ const findMatches = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, matches, "Matches fetched successfully"));
 });
 
+// New function to find partial matches
+const findPartialMatch = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+
+  // Fetch the current user's skills and interests
+  const currentUser = await User.findById(userId).select("skills interests");
+  if (!currentUser) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // Get existing connections to exclude them
+  const existingConnections = await Match.find({
+    $or: [{ user1: userId }, { user2: userId }],
+    status: "accepted",
+  });
+
+  const connectedUserIds = existingConnections.reduce((acc, match) => {
+    if (match.user1.toString() === userId.toString()) {
+      acc.add(match.user2.toString());
+    } else {
+      acc.add(match.user1.toString());
+    }
+    return acc;
+  }, new Set());
+
+  // Find potential matches
+  const candidates = await User.find({
+    _id: { $ne: userId, $nin: Array.from(connectedUserIds) }, // Exclude self and already connected users
+    // $or: [
+    skills: { $in: currentUser.interests }, // User's interests match candidate's skills
+    //  { interests: { $in: currentUser.skills } }  // User's skills match candidate's interests
+    // ]
+  })
+  .select("name skills interests")
+  .lean();
+
+  // Format the results
+  const partialMatches = candidates.map((candidate) => {
+    const skillsUserTeaches = candidate.skills.filter(skill => currentUser.interests.includes(skill));
+    const skillsUserLearns = candidate.interests.filter(interest => currentUser.skills.includes(interest));
+
+    return {
+      user_id: candidate._id,
+      name: candidate.name,
+      skills_user_teaches: skillsUserTeaches, // Skills the candidate can teach you
+      skills_user_learns: skillsUserLearns   // Skills the candidate wants to learn from you
+    };
+  });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, partialMatches, "Partial matches fetched successfully"));
+});
+
+
 const sendRequest = asyncHandler(async (req, res) => {
   const { recipientId, teachSkill, learnSkill } = req.body; 
   const senderId = req.user._id;
@@ -502,6 +557,7 @@ export {
   logoutUser,
   updateProfile,
   findMatches,
+  findPartialMatch, // Export the new function
   sendRequest,
   getPendingRequests,
   getConnectedUsers,
