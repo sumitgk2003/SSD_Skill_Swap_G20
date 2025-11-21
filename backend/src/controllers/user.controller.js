@@ -4,6 +4,7 @@ import { User } from "../models/user.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Match } from "../models/match.model.js";
 import mongoose from "mongoose";
+import { Review } from "../models/review.model.js";
 
 export const options = {
   httpOnly: true,
@@ -237,6 +238,21 @@ const findMatches = asyncHandler(async (req, res) => {
   .select("name interests") 
   .lean();
 
+  const candidateIds = candidates.map(c => c._id);
+  
+  let ratingsMap = new Map();
+
+  if (candidateIds.length > 0) {
+    const ratings = await Review.aggregate([
+      { $match: { toUser: { $in: candidateIds } } },
+      { $group: { _id: '$toUser', avgRating: { $avg: '$rating' }, count: { $sum: 1 } } }
+    ]);
+  
+    ratings.forEach(r => {
+      ratingsMap.set(r._id.toString(), { avg: r.avgRating, count: r.count });
+    });
+  }
+
   // 6. Format the results
   const matches = candidates.map((candidate) => {
     
@@ -245,10 +261,14 @@ const findMatches = asyncHandler(async (req, res) => {
       currentUser.skills.includes(candidateInterest)
     );
 
+    const ratingInfo = ratingsMap.get(candidate._id.toString());
+
     return {
       user_id: candidate._id,
       name: candidate.name,
-      skills_they_want: skillsTheyWant 
+      skills_they_want: skillsTheyWant,
+      avgRating: ratingInfo ? ratingInfo.avg : null,
+      reviewCount: ratingInfo ? ratingInfo.count : 0
     };
   });
 
