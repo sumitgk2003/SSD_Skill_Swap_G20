@@ -60,6 +60,28 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Timezone and availability for scheduling
+    timezone: {
+      type: String,
+      default: null,
+    },
+    // Preferred session formats: 'online', 'in person', 'chat'
+    preferredFormats: {
+      type: [String],
+      default: ['online','in person','chat'],
+    },
+    // Availability slots: { dayOfWeek: 0-6 (Sun-Sat), start: 'HH:MM', end: 'HH:MM' }
+    availability: {
+      type: [
+        {
+          dayOfWeek: { type: Number, min: 0, max: 6 },
+          start: { type: String },
+          end: { type: String },
+        }
+      ],
+      default: []
+    },
+    // Note: admin users are stored in a separate Admin model; do not add role here.
   },
   { timestamps: true }
 );

@@ -371,31 +371,43 @@ const MeetingsSection = ({ matchId, matchUser }) => {
     const [confirmation, setConfirmation] = useState('');
 
     const fetchMeetings = async () => {
+        console.log('fetchMeetings called for matchId', matchId, 'user', user && (user._id || user.id || user.email));
         setLoading(true);
         try {
             const res = await axios.get('http://localhost:8000/api/v1/meets', {
                 withCredentials: true,
             });
+                console.log('GET /api/v1/meets response', res?.data);
             if (res.data && res.data.success) {
                 // Filter meetings by match ID
                 const filteredMeetings = res.data.data.filter((meet) => {
                     return String(meet.match) === String(matchId);
                 });
+                    console.log('filteredMeetings for matchId', matchId, filteredMeetings);
 
                 const mapped = filteredMeetings.map((m) => ({
                     id: m._id,
                     title: m.title || (m.meetType ? (m.meetType === 'online' ? 'Online Meeting' : 'In-Person Meeting') : 'Meeting'),
                     host: String(m.organizer._id || m.organizer) === String(user._id) ? 'You' : (m.organizerName || 'Host'),
                     organizer: m.organizer._id || m.organizer,
+                    attendees: m.attendees || [],
                     type: m.meetType === 'online' ? 'online' : 'inperson',
                     date: new Date(m.dateAndTime).toISOString().slice(0, 10),
                     time: new Date(m.dateAndTime).toTimeString().slice(0, 5),
+                    duration: m.durationInMinutes || 30,
                     joinUrl: m.zoomJoinUrl || m.googleEventHtmlLink || null,
                 }));
+                
+                // log mapped meetings and participant checks for debugging
+                mapped.forEach((m) => {
+                    const isOrganizer = String(m.organizer) === String(user._id || user.id);
+                    const isAttendee = Array.isArray(m.attendees) && m.attendees.includes(user?.email);
+                    console.log('mapped meet', { id: m.id, organizer: m.organizer, attendees: m.attendees, isOrganizer, isAttendee });
+                });
                 setMeetings(mapped.sort((a, b) => (a.date + 'T' + a.time) > (b.date + 'T' + b.time) ? 1 : -1));
             }
         } catch (error) {
-            console.error('Error fetching meetings:', error);
+            console.error('Error fetching meetings:', error, error?.response?.data || null);
         } finally {
             setLoading(false);
         }
@@ -412,6 +424,60 @@ const MeetingsSection = ({ matchId, matchUser }) => {
 
     const handleDeleteMeet = async (meetId) => {
         setConfirmDialog({ show: true, meetId });
+    };
+
+    const handleMarkComplete = async (meeting) => {
+        try {
+            const role = window.prompt('Did you teach or learn in this session? (enter "teach" or "learn")', 'teach');
+            if (!role) return;
+            const normalized = role.trim().toLowerCase();
+            if (!['teach', 'learn'].includes(normalized)) return alert('Please enter "teach" or "learn"');
+
+            const rating = window.prompt('Optional: rate this session 1-5 (leave blank to skip)');
+            let ratingNum = undefined;
+            if (rating && rating.trim() !== '') {
+                ratingNum = Number(rating);
+                if (Number.isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+                    return alert('Rating must be a number between 1 and 5');
+                }
+            }
+
+            const currentUserId = user?._id || user?.id;
+            const partnerId = matchUser?._id || matchUser?.id;
+            const tutorId = normalized === 'teach' ? currentUserId : partnerId;
+            const learnerId = normalized === 'teach' ? partnerId : currentUserId;
+
+            // Debug: log resolved participant ids
+            console.log('Resolved participant ids', { currentUserId, partnerId, tutorId, learnerId });
+
+            const dateIso = `${meeting.date}T${meeting.time}:00Z`;
+
+            const payload = {
+                meetId: meeting.id,
+                tutorId,
+                learnerId,
+                date: dateIso,
+                durationInMinutes: meeting.duration || 30,
+                rating: ratingNum,
+            };
+
+            // Debug: log payload before sending
+            console.log('Submitting session payload', payload);
+
+            const res = await axios.post('http://localhost:8000/api/v1/sessions/complete', payload, { withCredentials: true });
+
+            // Debug: log response
+            console.log('sessions/complete response', res?.data, res?.status);
+
+            if (res.data && res.data.success) {
+                alert('Session recorded');
+            } else {
+                alert('Failed to record session');
+            }
+        } catch (err) {
+            console.error('Error marking session complete:', err, err?.response?.data || null);
+            alert(err.response?.data?.message || err.message || 'Failed');
+        }
     };
 
     const confirmDeleteMeet = async (meetId) => {
@@ -853,6 +919,25 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                                             {deleting === meeting.id ? 'Canceling...' : 'Cancel'}
                                         </button>
                                     )}
+                                    {/* Mark Complete - visible to participants */}
+                                    {(String(meeting.organizer) === String(user?._id || user?.id) || (meeting.attendees && meeting.attendees.includes(user?.email))) && (
+                                        <button
+                                            style={{
+                                                padding: '0.6rem 1.2rem',
+                                                backgroundColor: '#0d6efd',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                fontWeight: 'bold',
+                                                whiteSpace: 'nowrap',
+                                                marginLeft: '0.5rem'
+                                            }}
+                                            onClick={() => handleMarkComplete(meeting)}
+                                        >
+                                            Mark Complete
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -870,6 +955,12 @@ const MatchDetailPage = () => {
     const [matchData, setMatchData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('chat');
+    const [reviews, setReviews] = useState([]);
+    const [avgRating, setAvgRating] = useState(null);
+    const [reviewModalOpen, setReviewModalOpen] = useState(false);
+    const [reviewText, setReviewText] = useState('');
+    const [reviewRating, setReviewRating] = useState(5);
+    const [submittingReview, setSubmittingReview] = useState(false);
 
     // Add CSS animations
     useEffect(() => {
@@ -928,6 +1019,9 @@ const MatchDetailPage = () => {
                     
                     if (match) {
                         setMatchData(match);
+                        // fetch reviews for partner when we have match
+                        fetchReviewsForUser(match.partner._id);
+                        fetchAvgForUser(match.partner._id);
                     } else {
                         console.error('Match not found');
                     }
@@ -943,6 +1037,83 @@ const MatchDetailPage = () => {
             fetchMatchData();
         }
     }, [matchId, user]);
+
+    const fetchReviewsForUser = async (userId) => {
+        try {
+            const res = await axios.get(`http://localhost:8000/api/v1/reviews/${userId}`);
+            if (res.data && res.data.success) setReviews(res.data.data || []);
+        } catch (err) {
+            console.error('Error fetching reviews:', err);
+        }
+    };
+
+    const fetchAvgForUser = async (userId) => {
+        try {
+            const res = await axios.get(`http://localhost:8000/api/v1/reviews/${userId}/average`);
+            if (res.data && res.data.success) setAvgRating(res.data.data || null);
+        } catch (err) {
+            console.error('Error fetching avg rating:', err);
+        }
+    };
+
+    // Local styles used by the review modal
+    const styles = {
+        input: {
+            width: '100%',
+            padding: '0.6rem',
+            borderRadius: 8,
+            border: '1px solid var(--border-color)',
+            background: 'var(--background-primary)',
+            color: 'var(--text-primary)',
+            fontSize: '1rem',
+        },
+        textarea: {
+            width: '100%',
+            minHeight: 120,
+            padding: '0.6rem',
+            borderRadius: 8,
+            border: '1px solid var(--border-color)',
+            background: 'var(--background-primary)',
+            color: 'var(--text-primary)',
+            fontSize: '0.95rem',
+        },
+        button: {
+            padding: '0.5rem 0.9rem',
+            borderRadius: 8,
+            border: 'none',
+            background: 'var(--accent-primary)',
+            color: '#fff',
+            cursor: 'pointer',
+            fontWeight: 700,
+        }
+    };
+
+    const openReviewModal = () => {
+        setReviewText('');
+        setReviewRating(5);
+        setReviewModalOpen(true);
+    };
+
+    const submitReview = async () => {
+        if (!matchData) return;
+        setSubmittingReview(true);
+        try {
+            const payload = { toUserId: matchData.partner._id, rating: reviewRating, text: reviewText };
+            const res = await axios.post('http://localhost:8000/api/v1/reviews/', payload, { withCredentials: true });
+            if (res.data && res.data.success) {
+                setReviewModalOpen(false);
+                fetchReviewsForUser(matchData.partner._id);
+                fetchAvgForUser(matchData.partner._id);
+            } else {
+                alert('Failed to submit review');
+            }
+        } catch (err) {
+            console.error('Submit review failed', err);
+            alert(err.response?.data?.message || 'Failed to submit review');
+        } finally {
+            setSubmittingReview(false);
+        }
+    };
 
     const pageStyle = {
         padding: '4rem 2rem',
@@ -1003,7 +1174,6 @@ const MatchDetailPage = () => {
     const tabBtnStyle = (isActive) => ({
         padding: '1rem 1.5rem',
         backgroundColor: 'transparent',
-        border: 'none',
         borderBottom: isActive ? '3px solid var(--accent-primary)' : 'none',
         cursor: 'pointer',
         fontWeight: isActive ? 'bold' : 'normal',
@@ -1060,6 +1230,12 @@ const MatchDetailPage = () => {
                         <p style={matchSubtitleStyle}>
                             {matchData.skill_i_teach ? '📚 Teaching' : '🎓 Learning'} • {skillTitle}
                         </p>
+                        <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                            <div style={{ color: 'var(--text-secondary)' }}>
+                                ⭐ {avgRating && avgRating.avg !== null ? `${avgRating.avg} (${avgRating.count})` : 'No ratings yet'}
+                            </div>
+                            <button onClick={openReviewModal} style={{ padding: '0.4rem 0.8rem', borderRadius: 8, border: 'none', backgroundColor: 'var(--accent-primary)', color: 'white', cursor: 'pointer' }}>Leave Review</button>
+                        </div>
                     </div>
                 </div>
 
@@ -1079,6 +1255,46 @@ const MatchDetailPage = () => {
                 </div>
 
                 <div style={sectionStyle}>
+                    {/* Review Modal */}
+                    {reviewModalOpen && (
+                        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+                            <div style={{ width: 'min(720px, 95%)', background: 'var(--background-primary)', padding: '1.5rem', borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}>
+                                <h3 style={{ marginTop:0 }}>Leave a review for {matchData.partner.name}</h3>
+                                <div style={{ margin: '0.5rem 0' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.25rem' }}>Rating</label>
+                                    <select value={reviewRating} onChange={(e) => setReviewRating(Number(e.target.value))} style={styles.input}>
+                                        {[5,4,3,2,1].map(n => <option key={n} value={n}>{n} ★</option>)}
+                                    </select>
+                                </div>
+                                <div style={{ margin: '0.5rem 0' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.25rem' }}>Comments</label>
+                                    <textarea value={reviewText} onChange={(e) => setReviewText(e.target.value)} style={styles.textarea} />
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                    <button onClick={() => setReviewModalOpen(false)} style={{ ...styles.button, background: 'var(--background-secondary)', color: 'var(--text-primary)' }}>Cancel</button>
+                                    <button onClick={submitReview} disabled={submittingReview} style={{ ...styles.button }}>{submittingReview ? 'Submitting...' : 'Submit Review'}</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Reviews list */}
+                    {reviews && reviews.length > 0 && (
+                        <div style={{ marginBottom: '1rem' }}>
+                            <h3 style={{ marginTop: 0 }}>Recent Reviews</h3>
+                            <div style={{ display: 'grid', gap: '0.75rem' }}>
+                                {reviews.map(r => (
+                                    <div key={r._id} style={{ background: 'var(--background-secondary)', padding: '0.75rem', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <strong>{r.fromUser?.name || 'Someone'}</strong>
+                                            <span>{r.rating} ★</span>
+                                        </div>
+                                        {r.text && <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)' }}>{r.text}</p>}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     {activeTab === 'chat' && (
                         <ChatSection
                             matchId={matchId}

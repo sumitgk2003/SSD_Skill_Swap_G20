@@ -139,7 +139,7 @@ const logoutUser = asyncHandler(async (req, res) => {
 });
 
 const updateProfile = asyncHandler(async (req, res) => {
-  const { interests, skills, bio } = req.body;
+  const { interests, skills, bio, timezone, preferredFormats, availability } = req.body;
   console.log("jhdbsfjk");
   if (!Array.isArray(interests)) {
     throw new ApiError(400, "Interests must be an array");
@@ -151,20 +151,37 @@ const updateProfile = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Bio must be a string");
   }
 
-  // Convert skills to lowercase before validation and saving
+  // Convert skills/interests to lowercase before validation and saving
   const lowerCaseSkills = Array.isArray(skills) ? skills.map(skill => skill.toLowerCase()) : [];
-
-  // Convert interests to lowercase before validation and saving
   const lowerCaseInterests = Array.isArray(interests) ? interests.map(interest => interest.toLowerCase()) : [];
+
+  // Validate timezone (optional) and preferredFormats
+  const allowedFormats = ['online', 'in person', 'chat'];
+  const cleanedPreferredFormats = Array.isArray(preferredFormats)
+    ? preferredFormats.filter(f => allowedFormats.includes(f))
+    : undefined;
+
+  // Validate availability structure if provided
+  let cleanedAvailability = undefined;
+  if (Array.isArray(availability)) {
+    cleanedAvailability = availability
+      .filter(slot => slot && typeof slot.dayOfWeek === 'number' && typeof slot.start === 'string' && typeof slot.end === 'string')
+      .map(slot => ({ dayOfWeek: slot.dayOfWeek, start: slot.start, end: slot.end }));
+  }
   
   console.log("Updating profile for user:", req.user._id);
   console.log("New interests:", lowerCaseInterests);
   console.log("New skills:", lowerCaseSkills); // Log the lowercased skills
   console.log("New bio:", bio);
 
+  const updatePayload = { interests: lowerCaseInterests, skills: lowerCaseSkills, bio };
+  if (timezone && typeof timezone === 'string') updatePayload.timezone = timezone;
+  if (cleanedPreferredFormats) updatePayload.preferredFormats = cleanedPreferredFormats;
+  if (cleanedAvailability) updatePayload.availability = cleanedAvailability;
+
   const updatedUser = await User.findByIdAndUpdate(
     req.user._id,
-    { interests: lowerCaseInterests, skills: lowerCaseSkills, bio }, // Use lowerCaseSkills here
+    updatePayload,
     { new: true }
   ).select("-password -refreshToken");
 

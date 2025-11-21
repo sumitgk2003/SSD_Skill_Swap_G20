@@ -182,6 +182,13 @@ const CreateProfilePage = () => {
   const [learnSuggestions, setLearnSuggestions] = useState([]);
   
   const [showSaveMessage, setShowSaveMessage] = useState(false);
+  // Availability and preferences
+  const [timezone, setTimezone] = useState('');
+  const [preferredFormatsState, setPreferredFormatsState] = useState({ online: true, 'in person': true, chat: true });
+  const [availabilitySlots, setAvailabilitySlots] = useState([]);
+  const [slotDay, setSlotDay] = useState(1);
+  const [slotStart, setSlotStart] = useState('18:00');
+  const [slotEnd, setSlotEnd] = useState('19:00');
 
   // 1. Fetch all skills on load
   useEffect(() => {
@@ -226,6 +233,9 @@ const CreateProfilePage = () => {
     setLocalBio(userBio || '');
     setCurrentTeachingSkills(userSkills || []);
     setCurrentLearningSkills(userInterests || []);
+    // load timezone and preferred formats from user slice if available
+    const user = (window.__INITIAL_USER__ && window.__INITIAL_USER__) || null;
+    // Note: better approach is to pull timezone/preferredFormats from redux auth slice when available
   }, [userSkills, userInterests, userBio]);
 
   // 2. Filtering Logic
@@ -297,6 +307,9 @@ const CreateProfilePage = () => {
           interests: currentLearningSkills,
           skills: currentTeachingSkills,
           bio: bio,
+          timezone: timezone || undefined,
+          preferredFormats: Object.keys(preferredFormatsState).filter(k => preferredFormatsState[k]),
+          availability: availabilitySlots,
         },
         { withCredentials: true }
       );
@@ -313,6 +326,18 @@ const CreateProfilePage = () => {
     setTimeout(() => setShowSaveMessage(false), 3000);
   };
 
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  const addAvailabilitySlot = () => {
+    if (!slotStart || !slotEnd) return alert('Please provide start and end times');
+    const slot = { dayOfWeek: Number(slotDay), start: slotStart, end: slotEnd };
+    setAvailabilitySlots(prev => [...prev, slot]);
+  };
+
+  const removeAvailabilitySlot = (index) => {
+    setAvailabilitySlots(prev => prev.filter((_, i) => i !== index));
+  };
+
   return (
     <div style={styles.page}>
       <div style={styles.card}>
@@ -326,6 +351,49 @@ const CreateProfilePage = () => {
             placeholder={userBio || `Tell everyone a little about yourself...`} 
             style={styles.textarea} 
           />
+        </div>
+
+        {/* AVAILABILITY & PREFERENCES */}
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>Availability & Preferences</h2>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Timezone</label>
+            <input type="text" value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder={Intl.DateTimeFormat().resolvedOptions().timeZone || 'e.g. Asia/Kolkata'} style={styles.input} />
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Preferred formats</label>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {['online','in person','chat'].map(fmt => (
+                <label key={fmt} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input type="checkbox" checked={preferredFormatsState[fmt]} onChange={() => setPreferredFormatsState(prev => ({ ...prev, [fmt]: !prev[fmt] }))} />
+                  <span style={{ color: 'var(--text-primary)' }}>{fmt}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Availability slots</label>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+              <select value={slotDay} onChange={(e) => setSlotDay(e.target.value)} style={styles.input}>
+                {Array.from({ length: 7 }).map((_, i) => <option key={i} value={i}>{dayNames[i]}</option>)}
+              </select>
+              <input type="time" value={slotStart} onChange={(e) => setSlotStart(e.target.value)} style={{ ...styles.input, width: 140 }} />
+              <input type="time" value={slotEnd} onChange={(e) => setSlotEnd(e.target.value)} style={{ ...styles.input, width: 140 }} />
+              <button onClick={addAvailabilitySlot} style={styles.button}>Add slot</button>
+            </div>
+
+            <div style={styles.skillTagContainer}>
+              {availabilitySlots.map((s, idx) => (
+                <div key={idx} style={styles.skillTag}>
+                  {dayNames[s.dayOfWeek]} {s.start}–{s.end}
+                  <button onClick={() => removeAvailabilitySlot(idx)} style={styles.removeBtn}>×</button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* TEACHING SKILLS SECTION */}

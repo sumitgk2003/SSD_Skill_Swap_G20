@@ -65,6 +65,8 @@ import meetRouter from "./routes/meet.routes.js";
 import zoomRouter from "./controllers/zoom.controller.js";
 import messageRouter from "./routes/message.routes.js"; 
 import adminRouter from "./routes/admin.routes.js";
+import sessionRouter from "./routes/session.routes.js";
+import reviewRouter from "./routes/review.routes.js";
 
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/auth", authRouter);
@@ -73,6 +75,8 @@ app.use("/api/v1/zoom", zoomRouter);
 app.use("/api/v1/admin", adminRouter);
 
 app.use("/api/v1/messages", messageRouter);
+app.use('/api/v1/sessions', sessionRouter);
+app.use('/api/v1/reviews', reviewRouter);
 
 // 5. Export 'io' and 'Reciever' so the Controller can import them
 export { app, io, server };

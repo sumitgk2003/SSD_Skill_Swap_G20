@@ -262,6 +262,7 @@ const DashboardPage = () => {
   const [incomingRequests, setIncomingRequests] = useState([]);
   const [learningMatches, setLearningMatches] = useState([]);
   const [teachingMatches, setTeachingMatches] = useState([]);
+  const [sessionSummary, setSessionSummary] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -293,6 +294,15 @@ const DashboardPage = () => {
       }
     };
 
+    const fetchSessionSummary = async () => {
+      try {
+        const res = await axios.get('http://localhost:8000/api/v1/sessions/me/summary', { withCredentials: true });
+        if (res.data && res.data.success) setSessionSummary(res.data.data);
+      } catch (err) {
+        console.error('Error fetching session summary:', err);
+      }
+    };
+
     const fetchRequests = async () => {
       try {
         const res = await axios.get(
@@ -312,6 +322,7 @@ const DashboardPage = () => {
     if (user) {
       fetchData();
       fetchRequests();
+      fetchSessionSummary();
     }
   }, [user]);
 
@@ -386,6 +397,37 @@ const DashboardPage = () => {
       <div style={contentWrapperStyle}>
         <h1 style={headerStyle}>Welcome back, {user?.name || 'User'}!</h1>
         <p style={subHeaderStyle}>Here's a snapshot of your learning and teaching journey.</p>
+
+        {sessionSummary && (
+          <section style={{marginBottom: '2rem'}}>
+            <h2 style={sectionHeaderStyle}>Your Progress</h2>
+            <div style={{display:'flex', gap:'1rem', flexWrap:'wrap'}}>
+              <div style={{background:'var(--background-secondary)', padding:'1rem', borderRadius:12, minWidth:180}}>
+                <h3 style={{margin:0}}>Hours Taught</h3>
+                <p style={{fontSize:'1.5rem', margin:0}}>{sessionSummary.hoursTaught || 0} hrs</p>
+                <small>{sessionSummary.sessionsTaught || 0} sessions</small>
+              </div>
+
+              <div style={{background:'var(--background-secondary)', padding:'1rem', borderRadius:12, minWidth:180}}>
+                <h3 style={{margin:0}}>Hours Learned</h3>
+                <p style={{fontSize:'1.5rem', margin:0}}>{sessionSummary.hoursLearned || 0} hrs</p>
+                <small>{sessionSummary.sessionsLearned || 0} sessions</small>
+              </div>
+
+              <div style={{background:'var(--background-secondary)', padding:'1rem', borderRadius:12, minWidth:180}}>
+                <h3 style={{margin:0}}>Avg Rating</h3>
+                <p style={{fontSize:'1.5rem', margin:0}}>{sessionSummary.avgRatingReceived !== null ? sessionSummary.avgRatingReceived : '—'}</p>
+                <small>Rating received on taught sessions</small>
+              </div>
+
+              <div style={{background:'var(--background-secondary)', padding:'1rem', borderRadius:12, minWidth:180}}>
+                <h3 style={{margin:0}}>Current Streak</h3>
+                <p style={{fontSize:'1.5rem', margin:0}}>{sessionSummary.currentStreakDays || 0} days</p>
+                <small>Consecutive active days</small>
+              </div>
+            </div>
+          </section>
+        )}
         
         {loading ? (
             <p>Loading requests...</p>

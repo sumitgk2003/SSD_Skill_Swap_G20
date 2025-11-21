@@ -15,3 +15,13 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
     throw new ApiError(401, error);
   }
 });
+
+export const requireAdmin = asyncHandler(async (req, res, next) => {
+  // verifyJWT should have already set req.user; check Admin collection by email
+  if (!req.user || !req.user.email) throw new ApiError(401, 'Unauthorized');
+  // Lazy-load Admin model here to avoid circular imports at top
+  const { Admin } = await import("../models/admin.model.js");
+  const admin = await Admin.findOne({ email: req.user.email.toLowerCase() });
+  if (!admin) throw new ApiError(403, 'Admin privileges required');
+  next();
+});
