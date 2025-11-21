@@ -3,7 +3,6 @@ import client from '../api/client';
 
 const AdminSkillsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState('All');
   const [skills, setSkills] = useState([
     {
       id: 'SK001',
@@ -63,8 +62,9 @@ const AdminSkillsPage = () => {
         const normalized = data.map((s, idx) => ({
           id: `SK${String(idx + 1).padStart(3, '0')}`,
           name: s.skill,
-          category: 'General',
+          category: s.category || 'General',
           matches: s.matchesCount || 0,
+          description: s.description || '',
         }));
         setSkills(normalized);
       } catch (err) {
@@ -77,53 +77,40 @@ const AdminSkillsPage = () => {
     fetchSkills();
   }, []);
 
+  // Filter skills by search term (case-insensitive). If searchTerm is empty, show all.
   const filteredSkills = skills.filter((skill) => {
-    const matchesSearchTerm =
-      skill.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      skill.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      skill.category.toLowerCase().includes(searchTerm.toLowerCase());
+    const q = (searchTerm || '').trim().toLowerCase();
+    if (!q) return true;
+    const name = (skill.name || '').toLowerCase();
+    const category = (skill.category || '').toLowerCase();
+    const description = (skill.description || '').toLowerCase();
 
-    const matchesCategory =
-      filterCategory === 'All' || skill.category === filterCategory;
-
-    return matchesSearchTerm && matchesCategory;
+    return name.includes(q) || category.includes(q) || description.includes(q);
   });
-
-  const handleRemove = async (id, name) => {
-    if (!confirm(`Delete skill "${name}" from all users?`)) return;
-    try {
-      // Call backend admin endpoint to remove skill globally
-      await client.delete('/admin/skills', { params: { skill: name } });
-      setSkills((prev) => prev.filter((skill) => skill.id !== id));
-    } catch (err) {
-      alert(err?.response?.data?.message || err.message || 'Failed to delete skill');
-    }
-  };
 
   return (
     <div className="admin-skills-page p-6 bg-gray-50 min-h-screen">
       <h1 className="text-3xl font-bold text-gray-800 mb-6">Admin Skills Management</h1>
 
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0 sm:space-x-4">
-        <input
-          type="text"
-          placeholder="Search skills..."
-          className="p-2 border border-gray-300 rounded-md w-full sm:w-1/3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        <select
-          className="p-2 border border-gray-300 rounded-md w-full sm:w-1/4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
-        >
-          <option value="All">All Categories</option>
-          <option value="Frontend">Frontend</option>
-          <option value="Backend">Backend</option>
-          <option value="Design">Design</option>
-          <option value="Writing">Writing</option>
-          <option value="Mobile">Mobile</option>
-        </select>
+      <div className="flex items-center mb-6 space-x-4">
+        <div className="flex items-center w-full sm:w-1/3">
+          <input
+            type="text"
+            placeholder="Search skills by name or category..."
+            className="p-2 border border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          {searchTerm && (
+            <button
+              className="ml-2 px-3 py-1 bg-gray-200 rounded-md text-sm"
+              onClick={() => setSearchTerm('')}
+              aria-label="Clear search"
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -137,16 +124,14 @@ const AdminSkillsPage = () => {
         <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
           <thead>
             <tr style={{ backgroundColor: '#f2f2f2' }}>
-              <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Skill ID</th>
               <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Name</th>
               <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Category</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Matches</th>
+              <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Total Matches</th>
             </tr>
           </thead>
           <tbody>
             {filteredSkills.map((skill) => (
               <tr key={skill.id}>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{skill.id}</td>
                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>{skill.name}</td>
                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>{skill.category}</td>
                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>{skill.matches ?? 0}</td>
