@@ -2,7 +2,8 @@ import {Router} from "express";
 import {registerUser,loginUser,logoutUser,updateProfile,
 findMatches,sendRequest,getPendingRequests,getConnectedUsers,
 respondRequest,getAllSkills,getCurrentUser,getAllConnections,
-findPartialMatch} from "../controllers/user.controller.js";
+getUserProfileById
+} from "../controllers/user.controller.js";
 
 import {verifyJWT} from "../middlewares/auth.middleware.js";
 
@@ -11,6 +12,8 @@ const router=Router();
 router.route("/register").post(registerUser);
 router.route("/login").post(loginUser);
 router.route("/me").get(verifyJWT, getCurrentUser);
+router.route("/profile/:userId").get(verifyJWT, getUserProfileById);
+
 
 //secured routes
 
@@ -24,5 +27,5 @@ router.route("/respondRequest").post(verifyJWT, respondRequest);
 router.route("/getConnected").get(verifyJWT, getConnectedUsers);
 router.route("/getAllSkills").get(verifyJWT, getAllSkills);
 router.route("/getConnections").get(verifyJWT, getAllConnections);
-router.route("/getPartialMatches").get(verifyJWT, findPartialMatch);
+
 export default router;

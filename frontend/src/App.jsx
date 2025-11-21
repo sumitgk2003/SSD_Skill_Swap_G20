@@ -15,6 +15,7 @@ import FindMatchesPage from './pages/FindMatchesPage';
 import MeetsListPage from './pages/MeetScheduler';
 import SkillDetailPage from './pages/SkillDetailPage';
 import MatchDetailPage from './pages/MatchDetailPage';
+import UserProfilePage from './pages/UserProfilePage';
 import './index.css';
 import './App.css';
 
@@ -71,6 +72,7 @@ const App = () => {
           <Route path="find-matches" element={<FindMatchesPage />} />
           <Route path="skill/:skillId" element={<SkillDetailPage />} />
           <Route path="match/:matchId" element={<MatchDetailPage />} />
+          <Route path="user/:userId" element={<UserProfilePage />} />
         </Route>
       </Route>
     </Routes>

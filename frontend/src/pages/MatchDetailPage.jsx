@@ -964,12 +964,6 @@ const MatchDetailPage = () => {
     const [matchData, setMatchData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('chat');
-    const [reviews, setReviews] = useState([]);
-    const [avgRating, setAvgRating] = useState(null);
-    const [reviewModalOpen, setReviewModalOpen] = useState(false);
-    const [reviewText, setReviewText] = useState('');
-    const [reviewRating, setReviewRating] = useState(5);
-    const [submittingReview, setSubmittingReview] = useState(false);
 
     // Add CSS animations
     useEffect(() => {
@@ -1028,9 +1022,6 @@ const MatchDetailPage = () => {
                     
                     if (match) {
                         setMatchData(match);
-                        // fetch reviews for partner when we have match
-                        fetchReviewsForUser(match.partner._id);
-                        fetchAvgForUser(match.partner._id);
                     } else {
                         console.error('Match not found');
                     }
@@ -1046,83 +1037,6 @@ const MatchDetailPage = () => {
             fetchMatchData();
         }
     }, [matchId, user]);
-
-    const fetchReviewsForUser = async (userId) => {
-        try {
-            const res = await axios.get(`http://localhost:8000/api/v1/reviews/${userId}`);
-            if (res.data && res.data.success) setReviews(res.data.data || []);
-        } catch (err) {
-            console.error('Error fetching reviews:', err);
-        }
-    };
-
-    const fetchAvgForUser = async (userId) => {
-        try {
-            const res = await axios.get(`http://localhost:8000/api/v1/reviews/${userId}/average`);
-            if (res.data && res.data.success) setAvgRating(res.data.data || null);
-        } catch (err) {
-            console.error('Error fetching avg rating:', err);
-        }
-    };
-
-    // Local styles used by the review modal
-    const styles = {
-        input: {
-            width: '100%',
-            padding: '0.6rem',
-            borderRadius: 8,
-            border: '1px solid var(--border-color)',
-            background: 'var(--background-primary)',
-            color: 'var(--text-primary)',
-            fontSize: '1rem',
-        },
-        textarea: {
-            width: '100%',
-            minHeight: 120,
-            padding: '0.6rem',
-            borderRadius: 8,
-            border: '1px solid var(--border-color)',
-            background: 'var(--background-primary)',
-            color: 'var(--text-primary)',
-            fontSize: '0.95rem',
-        },
-        button: {
-            padding: '0.5rem 0.9rem',
-            borderRadius: 8,
-            border: 'none',
-            background: 'var(--accent-primary)',
-            color: '#fff',
-            cursor: 'pointer',
-            fontWeight: 700,
-        }
-    };
-
-    const openReviewModal = () => {
-        setReviewText('');
-        setReviewRating(5);
-        setReviewModalOpen(true);
-    };
-
-    const submitReview = async () => {
-        if (!matchData) return;
-        setSubmittingReview(true);
-        try {
-            const payload = { toUserId: matchData.partner._id, rating: reviewRating, text: reviewText };
-            const res = await axios.post('http://localhost:8000/api/v1/reviews/', payload, { withCredentials: true });
-            if (res.data && res.data.success) {
-                setReviewModalOpen(false);
-                fetchReviewsForUser(matchData.partner._id);
-                fetchAvgForUser(matchData.partner._id);
-            } else {
-                alert('Failed to submit review');
-            }
-        } catch (err) {
-            console.error('Submit review failed', err);
-            alert(err.response?.data?.message || 'Failed to submit review');
-        } finally {
-            setSubmittingReview(false);
-        }
-    };
 
     const pageStyle = {
         padding: '4rem 2rem',
@@ -1239,12 +1153,6 @@ const MatchDetailPage = () => {
                         <p style={matchSubtitleStyle}>
                             {matchData.skill_i_teach ? '📚 Teaching' : '🎓 Learning'} • {skillTitle}
                         </p>
-                        <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                            <div style={{ color: 'var(--text-secondary)' }}>
-                                ⭐ {avgRating && avgRating.avg !== null ? `${avgRating.avg} (${avgRating.count})` : 'No ratings yet'}
-                            </div>
-                            <button onClick={openReviewModal} style={{ padding: '0.4rem 0.8rem', borderRadius: 8, border: 'none', backgroundColor: 'var(--accent-primary)', color: 'white', cursor: 'pointer' }}>Leave Review</button>
-                        </div>
                     </div>
                 </div>
 
@@ -1264,46 +1172,6 @@ const MatchDetailPage = () => {
                 </div>
 
                 <div style={sectionStyle}>
-                    {/* Review Modal */}
-                    {reviewModalOpen && (
-                        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
-                            <div style={{ width: 'min(720px, 95%)', background: 'var(--background-primary)', padding: '1.5rem', borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}>
-                                <h3 style={{ marginTop:0 }}>Leave a review for {matchData.partner.name}</h3>
-                                <div style={{ margin: '0.5rem 0' }}>
-                                    <label style={{ display: 'block', marginBottom: '0.25rem' }}>Rating</label>
-                                    <select value={reviewRating} onChange={(e) => setReviewRating(Number(e.target.value))} style={styles.input}>
-                                        {[5,4,3,2,1].map(n => <option key={n} value={n}>{n} ★</option>)}
-                                    </select>
-                                </div>
-                                <div style={{ margin: '0.5rem 0' }}>
-                                    <label style={{ display: 'block', marginBottom: '0.25rem' }}>Comments</label>
-                                    <textarea value={reviewText} onChange={(e) => setReviewText(e.target.value)} style={styles.textarea} />
-                                </div>
-                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                                    <button onClick={() => setReviewModalOpen(false)} style={{ ...styles.button, background: 'var(--background-secondary)', color: 'var(--text-primary)' }}>Cancel</button>
-                                    <button onClick={submitReview} disabled={submittingReview} style={{ ...styles.button }}>{submittingReview ? 'Submitting...' : 'Submit Review'}</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Reviews list */}
-                    {reviews && reviews.length > 0 && (
-                        <div style={{ marginBottom: '1rem' }}>
-                            <h3 style={{ marginTop: 0 }}>Recent Reviews</h3>
-                            <div style={{ display: 'grid', gap: '0.75rem' }}>
-                                {reviews.map(r => (
-                                    <div key={r._id} style={{ background: 'var(--background-secondary)', padding: '0.75rem', borderRadius: 8, border: '1px solid var(--border-color)' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <strong>{r.fromUser?.name || 'Someone'}</strong>
-                                            <span>{r.rating} ★</span>
-                                        </div>
-                                        {r.text && <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)' }}>{r.text}</p>}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                     {activeTab === 'chat' && (
                         <ChatSection
                             matchId={matchId}
