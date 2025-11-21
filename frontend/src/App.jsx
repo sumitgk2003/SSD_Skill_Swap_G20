@@ -26,6 +26,8 @@ import AdminUsersPage from './pages/AdminUsersPage';
 import AdminSkillsPage from './pages/AdminSkillsPage';
 import AdminDisputesPage from './pages/AdminDisputesPage';
 import AdminPolicyPage from './pages/AdminPolicyPage';
+import AdminLayout from './pages/AdminLayout';
+import AdminProtectedRoute from './components/AdminProtectedRoute';
 // This component provides a consistent layout with a header for all pages.
 const AppLayout = () => {
   const theme = useSelector((state) => state.theme.theme);
@@ -49,6 +51,18 @@ const AppLayout = () => {
 const App = () => {
   return (
     <Routes>
+      {/* Admin routes use AdminLayout without the main Header */}
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<AdminLoginPage />} />
+        <Route element={<AdminProtectedRoute />}> 
+          <Route path="dashboard" element={<AdminPage />} />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="skills" element={<AdminSkillsPage />} />
+          <Route path="disputes" element={<AdminDisputesPage />} />
+          <Route path="policy" element={<AdminPolicyPage />} />
+        </Route>
+      </Route>
+
       <Route path="/" element={<AppLayout />}>
         {/* Public Routes */}
         <Route index element={<HomePage />} />
@@ -57,12 +71,6 @@ const App = () => {
         <Route path="auth/success" element={<AuthSuccess />} />
         <Route path="signup" element={<SignUpPage />} />
         <Route path="schedule" element={<MeetsListPage/>} />
-        <Route path="admin" element={<AdminLoginPage />} />
-        <Route path="admin/dashboard" element={<AdminPage />} />
-        <Route path="admin/users" element={<AdminUsersPage />} />
-        <Route path="admin/skills" element={<AdminSkillsPage />} />
-        <Route path="admin/disputes" element={<AdminDisputesPage />} />
-        <Route path="admin/policy" element={<AdminPolicyPage />} />
 
         {/* Protected Routes - only accessible when logged in */}
         <Route element={<ProtectedRoute />}>

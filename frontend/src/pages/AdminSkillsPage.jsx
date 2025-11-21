@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import client from '../api/client';
 
 const AdminSkillsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,6 +49,34 @@ const AdminSkillsPage = () => {
     },
   ]);
 
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    // Fetch skills with match counts from backend admin endpoint
+    const fetchSkills = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await client.get('/admin/skills');
+        const data = res?.data?.data || [];
+        const normalized = data.map((s, idx) => ({
+          id: `SK${String(idx + 1).padStart(3, '0')}`,
+          name: s.skill,
+          category: 'General',
+          matches: s.matchesCount || 0,
+        }));
+        setSkills(normalized);
+      } catch (err) {
+        setError(err?.response?.data?.message || err.message || 'Failed to load skills');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSkills();
+  }, []);
+
   const filteredSkills = skills.filter((skill) => {
     const matchesSearchTerm =
       skill.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -60,10 +89,15 @@ const AdminSkillsPage = () => {
     return matchesSearchTerm && matchesCategory;
   });
 
-  const handleRemove = (id) => {
-    console.log(`Remove skill with ID: ${id}`);
-    setSkills(skills.filter(skill => skill.id !== id));
-    // In a real app, you'd send an API request to remove the skill
+  const handleRemove = async (id, name) => {
+    if (!confirm(`Delete skill "${name}" from all users?`)) return;
+    try {
+      // Call backend admin endpoint to remove skill globally
+      await client.delete('/admin/skills', { params: { skill: name } });
+      setSkills((prev) => prev.filter((skill) => skill.id !== id));
+    } catch (err) {
+      alert(err?.response?.data?.message || err.message || 'Failed to delete skill');
+    }
   };
 
   return (
@@ -92,7 +126,9 @@ const AdminSkillsPage = () => {
         </select>
       </div>
 
-      {filteredSkills.length === 0 ? (
+      {loading ? (
+        <div className="p-6">Loading skills...</div>
+      ) : filteredSkills.length === 0 ? (
         <div className="bg-white p-6 rounded-lg shadow-md text-center text-gray-600">
           <p className="text-lg font-semibold">No skills found matching your criteria.</p>
           <p className="text-sm mt-2">Try adjusting your search term or filter.</p>
@@ -104,9 +140,7 @@ const AdminSkillsPage = () => {
               <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Skill ID</th>
               <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Name</th>
               <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Category</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Description</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Added Date</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Actions</th>
+              <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Matches</th>
             </tr>
           </thead>
           <tbody>
@@ -115,16 +149,7 @@ const AdminSkillsPage = () => {
                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>{skill.id}</td>
                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>{skill.name}</td>
                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>{skill.category}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{skill.description}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{skill.addedDate}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                  <button
-                    onClick={() => handleRemove(skill.id)}
-                    style={{ padding: '5px 10px', cursor: 'pointer', backgroundColor: '#f44336', color: 'white', border: 'none' }}
-                  >
-                    Remove
-                  </button>
-                </td>
+                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{skill.matches ?? 0}</td>
               </tr>
             ))}
           </tbody>

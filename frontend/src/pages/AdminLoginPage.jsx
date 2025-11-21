@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import client from '../api/client';
 
 const AdminLoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const pageStyle = {
     display: 'flex',
@@ -64,12 +68,34 @@ const AdminLoginPage = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // In a real application, you would handle authentication here.
-    // For this task, we are only creating the UI.
-    console.log('Admin Login Attempt:', { username, password });
-    alert('Login logic not implemented. This is a UI-only demonstration.');
-    // On successful login, you would typically redirect to /admin/dashboard
+    // Send credentials to backend admin login endpoint
+    setError(null);
+    setLoading(true);
+    client
+      .post('/admin/login', { email: username, password })
+      .then((res) => {
+        const data = res?.data;
+        if (data && data.success) {
+          // Save admin info & access token locally (frontend state or storage)
+          try {
+            if (data.data?.user) localStorage.setItem('admin', JSON.stringify(data.data.user));
+            if (data.data?.accessToken) localStorage.setItem('adminAccessToken', data.data.accessToken);
+          } catch (err) {
+            // ignore storage errors
+          }
+          // Redirect to admin dashboard after login
+          navigate('/admin/dashboard');
+        } else {
+          setError(data?.message || 'Login failed');
+        }
+      })
+      .catch((err) => {
+        const msg = err?.response?.data?.message || err.message || 'Login failed';
+        setError(msg);
+      })
+      .finally(() => setLoading(false));
   };
+
 
   return (
     <div style={pageStyle}>
@@ -95,11 +121,13 @@ const AdminLoginPage = () => {
           <button
             type="submit"
             style={buttonStyle}
+            disabled={loading}
             onMouseOver={(e) => e.currentTarget.style.backgroundColor = buttonHoverStyle.backgroundColor}
             onMouseOut={(e) => e.currentTarget.style.backgroundColor = buttonStyle.backgroundColor}
           >
-            Login
+            {loading ? 'Logging in...' : 'Login'}
           </button>
+          {error && <div style={{ color: 'red', marginTop: 10 }}>{error}</div>}
         </form>
         <p style={{ marginTop: '20px', color: '#666' }}>
           <Link to="/" style={{ color: '#007bff', textDecoration: 'none' }}>Go back to Home</Link>
