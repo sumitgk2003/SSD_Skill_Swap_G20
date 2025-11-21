@@ -392,8 +392,6 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                     zoomUrl: m.zoomJoinUrl || null,
                     googleCalendarUrl: m.googleEventHtmlLink || null,
                     joinUrl: m.zoomJoinUrl || m.googleEventHtmlLink || null,
-                    // notes should mirror title (frontend-only behavior)
-                    notes: m.title || null,
                 }));
                 setMeetings(mapped.sort((a, b) => (a.date + 'T' + a.time) > (b.date + 'T' + b.time) ? 1 : -1));
             }
@@ -858,11 +856,6 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                                     )}
                                 </div>
                                 </div>
-                                {meeting.notes && (
-                                    <p style={{ ...meetingDetailsStyle, marginTop: '0.5rem', fontSize: '0.85rem', fontStyle: 'italic', color: 'var(--text-secondary)', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
-                                        📝 {meeting.notes}
-                                    </p>
-                                )}
                             </div>
                         ))}
                 </div>
