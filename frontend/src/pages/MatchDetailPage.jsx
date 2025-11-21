@@ -366,7 +366,6 @@ const MeetingsSection = ({ matchId, matchUser }) => {
     const [date, setDate] = useState('');
     const [time, setTime] = useState('');
     const [duration, setDuration] = useState(30);
-    const [note, setNote] = useState('');
     const [errors, setErrors] = useState(null);
     const [confirmation, setConfirmation] = useState('');
 
@@ -388,14 +387,17 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                 const mapped = filteredMeetings.map((m) => ({
                     id: m._id,
                     title: m.title || (m.meetType ? (m.meetType === 'online' ? 'Online Meeting' : 'In-Person Meeting') : 'Meeting'),
-                    host: String(m.organizer._id || m.organizer) === String(user._id) ? 'You' : (m.organizerName || 'Host'),
-                    organizer: m.organizer._id || m.organizer,
+                    host: String((m.organizer && (m.organizer._id || m.organizer)) || '') === String(user?._id || user?.id) ? 'You' : (m.organizerName || (m.organizer && m.organizer.name) || 'Host'),
+                    // normalize organizer to an id string when possible
+                    organizer: (m.organizer && (m.organizer._id || m.organizer)) || m.organizer,
                     attendees: m.attendees || [],
                     type: m.meetType === 'online' ? 'online' : 'inperson',
-                    date: new Date(m.dateAndTime).toISOString().slice(0, 10),
-                    time: new Date(m.dateAndTime).toTimeString().slice(0, 5),
+                    date: m.dateAndTime ? new Date(m.dateAndTime).toISOString().slice(0, 10) : null,
+                    time: m.dateAndTime ? new Date(m.dateAndTime).toTimeString().slice(0, 5) : null,
                     duration: m.durationInMinutes || 30,
-                    joinUrl: m.zoomJoinUrl || m.googleEventHtmlLink || null,
+                    // provide explicit fields used in rendering
+                    zoomUrl: m.zoomJoinUrl || null,
+                    googleCalendarUrl: m.googleEventHtmlLink || null,
                 }));
                 
                 // log mapped meetings and participant checks for debugging
@@ -450,7 +452,7 @@ const MeetingsSection = ({ matchId, matchUser }) => {
             // Debug: log resolved participant ids
             console.log('Resolved participant ids', { currentUserId, partnerId, tutorId, learnerId });
 
-            const dateIso = `${meeting.date}T${meeting.time}:00Z`;
+            const dateIso = meeting.date && meeting.time ? `${meeting.date}T${meeting.time}:00Z` : null;
 
             const payload = {
                 meetId: meeting.id,
@@ -460,6 +462,12 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                 durationInMinutes: meeting.duration || 30,
                 rating: ratingNum,
             };
+
+            // Validate required fields before sending
+            if (!payload.tutorId || !payload.learnerId || !payload.date || !payload.durationInMinutes) {
+                console.error('Cannot submit session, missing required fields', payload);
+                return alert('Unable to record session: missing required information (tutor, learner, date or duration)');
+            }
 
             // Debug: log payload before sending
             console.log('Submitting session payload', payload);
@@ -513,11 +521,10 @@ const MeetingsSection = ({ matchId, matchUser }) => {
         const payload = {
             match_id: matchId,
             type: meetType === 'inperson' ? 'in person' : 'online',
-            title: title || `${meetType === 'online' ? 'Online' : 'In-Person'} session with ${matchUser?.name}`,
+            note: title || `${meetType === 'online' ? 'Online' : 'In-Person'} session with ${matchUser?.name}`,
             date,
             time,
             duration,
-            note,
             with: matchUser ? { id: matchUser._id, name: matchUser.name, email: matchUser.email } : null,
         };
         return payload;
@@ -534,7 +541,7 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                 setConfirmation('Meeting scheduled successfully');
                 setSchedulerOpen(false);
                 // reset small form
-                setTitle(''); setDate(''); setTime(''); setDuration(30); setNote('');
+                setTitle(''); setDate(''); setTime(''); setDuration(30);
                 // refresh meetings
                 await fetchMeetings();
                 setTimeout(() => setConfirmation(''), 5000);
@@ -554,8 +561,7 @@ const MeetingsSection = ({ matchId, matchUser }) => {
         border: '1px solid var(--border-color)',
         marginBottom: '1rem',
         display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        flexDirection: 'column',
         gap: '1rem',
     };
 
@@ -712,7 +718,7 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                         <input type="number" min={5} value={duration} onChange={(e) => setDuration(Number(e.target.value))} style={{ width: 140, padding: '0.6rem', borderRadius: 10, border: '1px solid var(--border-color)' }} />
                     </div>
 
-                    <textarea placeholder="Notes (optional)" value={note} onChange={(e) => setNote(e.target.value)} style={{ width: '100%', padding: '0.75rem', borderRadius: 10, border: '1px solid var(--border-color)', minHeight: 100 }} />
+                    {/* Notes and title are treated the same: single Title/Notes input above. */}
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
                         <button onClick={handleCreateMeeting} style={{ padding: '0.75rem 1rem', borderRadius: 10, border: 'none', background: 'var(--accent-primary)', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>Create Meet</button>
@@ -788,83 +794,85 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                         })
                         .map((meeting) => (
                             <div key={meeting.id} style={meetingCardStyle}>
-                                <div style={meetingInfoStyle}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                                        <h4 style={meetingTitleStyle}>{meeting.title}</h4>
-                                    
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+                                    <div style={meetingInfoStyle}>
+                                        <h4 style={{ ...meetingTitleStyle, marginBottom: '0.75rem', fontWeight: 'bold' }}>{meeting.title}</h4>
+                                        <p style={meetingDetailsStyle}>
+                                            <span style={pillStyle(meeting.type)}>
+                                                {meeting.type === 'online' ? '🌐 Online' : '📍 In-Person'}
+                                            </span>
+                                        </p>
+                                        <p style={meetingDetailsStyle}>
+                                            📅 {meeting.date} at {meeting.time}
+                                        </p>
+                                        <p style={meetingDetailsStyle}>
+                                            👤 {meeting.host}
+                                        </p>
                                     </div>
-                                    <p style={meetingDetailsStyle}>
-                                        <span style={pillStyle(meeting.type)}>
-                                            {meeting.type === 'online' ? '🌐 Online' : '📍 In-Person'}
-                                        </span>
-                                    </p>
-                                    <p style={meetingDetailsStyle}>
-                                        📅 {meeting.date} at {meeting.time}
-                                    </p>
-                                    <p style={meetingDetailsStyle}>
-                                        👤 {meeting.host}
-                                    </p>
-                                </div>
-                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                                    {meeting.type === 'online' && meeting.joinUrl && (
+                                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flexShrink: 0 }}>
+                                    {meeting.type === 'online' && (
                                         <>
-                                            <button
-                                                style={{
-                                                    width: '48px',
-                                                    height: '48px',
-                                                    padding: 0,
-                                                    backgroundColor: 'transparent',
-                                                    border: 'none',
-                                                    cursor: 'pointer',
-                                                    borderRadius: '8px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    transition: 'all 0.2s ease',
-                                                }}
-                                                onClick={() => handleJoin(meeting.joinUrl)}
-                                                title="Join Zoom Meeting"
-                                                onMouseEnter={(e) => {
-                                                    e.target.style.backgroundColor = 'rgba(11, 92, 255, 0.1)';
-                                                    e.target.style.transform = 'scale(1.1)';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.target.style.backgroundColor = 'transparent';
-                                                    e.target.style.transform = 'scale(1)';
-                                                }}
-                                            >
-                                                <img src={zoomLogo} alt="Zoom" style={{ width: '40px', height: '40px' }} />
-                                            </button>
-                                            <button
-                                                style={{
-                                                    width: '48px',
-                                                    height: '48px',
-                                                    padding: 0,
-                                                    backgroundColor: 'transparent',
-                                                    border: 'none',
-                                                    cursor: 'pointer',
-                                                    borderRadius: '8px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    transition: 'all 0.2s ease',
-                                                }}
-                                                onClick={() => handleJoin(meeting.joinUrl)}
-                                                title="View Calendar Event"
-                                                onMouseEnter={(e) => {
-                                                    e.target.style.backgroundColor = 'rgba(66, 133, 244, 0.1)';
-                                                    e.target.style.transform = 'scale(1.1)';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.target.style.backgroundColor = 'transparent';
-                                                    e.target.style.transform = 'scale(1)';
-                                                }}
-                                            >
-                                                <img src={calendarLogo} alt="Calendar" style={{ width: '40px', height: '40px' }} />
-                                            </button>
+                                            {meeting.zoomUrl && (
+                                                <button
+                                                    style={{
+                                                        width: '48px',
+                                                        height: '48px',
+                                                        padding: 0,
+                                                        backgroundColor: 'transparent',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        borderRadius: '8px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        transition: 'all 0.2s ease',
+                                                    }}
+                                                    onClick={() => handleJoin(meeting.zoomUrl)}
+                                                    title="Join Zoom Meeting"
+                                                    onMouseEnter={(e) => {
+                                                        e.target.style.backgroundColor = 'rgba(11, 92, 255, 0.1)';
+                                                        e.target.style.transform = 'scale(1.1)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.target.style.backgroundColor = 'transparent';
+                                                        e.target.style.transform = 'scale(1)';
+                                                    }}
+                                                >
+                                                    <img src={zoomLogo} alt="Zoom" style={{ width: '40px', height: '40px' }} />
+                                                </button>
+                                            )}
+                                            {meeting.googleCalendarUrl && (
+                                                <button
+                                                    style={{
+                                                        width: '48px',
+                                                        height: '48px',
+                                                        padding: 0,
+                                                        backgroundColor: 'transparent',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        borderRadius: '8px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        transition: 'all 0.2s ease',
+                                                    }}
+                                                    onClick={() => handleJoin(meeting.googleCalendarUrl)}
+                                                    title="View Google Calendar Event"
+                                                    onMouseEnter={(e) => {
+                                                        e.target.style.backgroundColor = 'rgba(66, 133, 244, 0.1)';
+                                                        e.target.style.transform = 'scale(1.1)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.target.style.backgroundColor = 'transparent';
+                                                        e.target.style.transform = 'scale(1)';
+                                                    }}
+                                                >
+                                                    <img src={calendarLogo} alt="Calendar" style={{ width: '40px', height: '40px' }} />
+                                                </button>
+                                            )}
                                         </>
                                     )}
-                                    {meeting.type === 'inperson' && meeting.joinUrl && (
+                                    {meeting.type === 'inperson' && meeting.googleCalendarUrl && (
                                         <button
                                             style={{
                                                 width: '48px',
@@ -879,7 +887,7 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                                                 justifyContent: 'center',
                                                 transition: 'all 0.2s ease',
                                             }}
-                                            onClick={() => handleJoin(meeting.joinUrl)}
+                                            onClick={() => handleJoin(meeting.googleCalendarUrl)}
                                             title="View Calendar Event"
                                             onMouseEnter={(e) => {
                                                 e.target.style.backgroundColor = 'rgba(66, 133, 244, 0.1)';
@@ -938,6 +946,7 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                                             Mark Complete
                                         </button>
                                     )}
+                                </div>
                                 </div>
                             </div>
                         ))}
