@@ -408,6 +408,13 @@ const MeetingsSection = ({ matchId, matchUser }) => {
     const [scheduledRole, setScheduledRole] = useState('teach'); // 'teach' or 'learn'
     const [errors, setErrors] = useState(null);
     const [confirmation, setConfirmation] = useState('');
+    // Reschedule modal state
+    const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+    const [rescheduleTarget, setRescheduleTarget] = useState(null);
+    const [rescheduleDate, setRescheduleDate] = useState('');
+    const [rescheduleTime, setRescheduleTime] = useState('');
+    const [rescheduleDuration, setRescheduleDuration] = useState(30);
+    const [rescheduling, setRescheduling] = useState(false);
 
     const fetchMeetings = async () => {
         console.log('fetchMeetings called for matchId', matchId, 'user', user && (user._id || user.id || user.email));
@@ -969,7 +976,8 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                                             <img src={calendarLogo} alt="Calendar" style={{ width: '40px', height: '40px' }} />
                                         </button>
                                     )}
-                                    {isOrganizer && !isCompleted && (
+                                    {isParticipant && !isCompleted && (
+                                        <>
                                         <button
                                             style={{
                                                 padding: '0.6rem 1.2rem',
@@ -994,6 +1002,30 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                                         >
                                             {deleting === meeting.id ? 'Canceling...' : 'Cancel'}
                                         </button>
+                                        <button
+                                            style={{
+                                                padding: '0.6rem 1.2rem',
+                                                backgroundColor: '#6f42c1',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                fontWeight: 'bold',
+                                                whiteSpace: 'nowrap',
+                                                marginLeft: '0.5rem'
+                                            }}
+                                            onClick={() => {
+                                                // open reschedule modal prefilled
+                                                setRescheduleTarget(meeting);
+                                                setRescheduleDate(meeting.date || '');
+                                                setRescheduleTime(meeting.time || '');
+                                                setRescheduleDuration(meeting.duration || 30);
+                                                setRescheduleModalOpen(true);
+                                            }}
+                                        >
+                                            Reschedule
+                                        </button>
+                                        </>
                                     )}
                                     {/* Mark Complete - visible to participants and only when not already completed */}
                                     {completedSession && !completedSession.completed && String(completedSession.learner?._id || completedSession.learner) === String(user?._id || user?.id) && (
@@ -1075,6 +1107,44 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                             <button onClick={() => { setCompleteModalOpen(false); setCurrentMeetingToComplete(null); }} style={{ ...styles.button, background: 'var(--background-secondary)', color: 'var(--text-primary)' }}>Cancel</button>
                             <button onClick={submitMarkComplete} disabled={submittingMark} style={{ ...styles.button }}>{submittingMark ? 'Submitting...' : 'Mark Complete'}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Reschedule Modal (local to MeetingsSection) */}
+            {rescheduleModalOpen && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+                    <div style={{ width: 'min(640px, 95%)', background: 'var(--background-primary)', padding: '1.25rem', borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}>
+                        <h3 style={{ marginTop:0 }}>Reschedule meeting</h3>
+                        <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>Choose a new date and time for this meeting.</p>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                            <input type="date" value={rescheduleDate} onChange={(e) => setRescheduleDate(e.target.value)} style={styles.input} />
+                            <input type="time" value={rescheduleTime} onChange={(e) => setRescheduleTime(e.target.value)} style={styles.input} />
+                            <input type="number" min={5} value={rescheduleDuration} onChange={(e) => setRescheduleDuration(Number(e.target.value))} style={{ ...styles.input, width: 140 }} />
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: 12 }}>
+                            <button onClick={() => { setRescheduleModalOpen(false); setRescheduleTarget(null); }} style={{ ...styles.button, background: 'var(--background-secondary)', color: 'var(--text-primary)' }}>Cancel</button>
+                            <button onClick={async () => {
+                                if (!rescheduleTarget) return;
+                                setRescheduling(true);
+                                try {
+                                    const payload = { date: rescheduleDate, time: rescheduleTime, duration: rescheduleDuration };
+                                    const res = await axios.patch(`http://localhost:8000/api/v1/meets/${rescheduleTarget.id}/reschedule`, payload, { withCredentials: true });
+                                    if (res.data && (res.data.success || res.status === 200)) {
+                                        setRescheduleModalOpen(false);
+                                        setRescheduleTarget(null);
+                                        await fetchMeetings();
+                                        try { await fetchSessions(); } catch(e){}
+                                    } else {
+                                        alert('Failed to reschedule meeting');
+                                    }
+                                } catch (err) {
+                                    console.error('Reschedule failed', err);
+                                    alert(err.response?.data?.message || err.message || 'Failed to reschedule');
+                                } finally {
+                                    setRescheduling(false);
+                                }
+                            }} disabled={rescheduling} style={{ ...styles.button }}>{rescheduling ? 'Rescheduling...' : 'Reschedule'}</button>
                         </div>
                     </div>
                 </div>

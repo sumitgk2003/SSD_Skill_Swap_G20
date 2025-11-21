@@ -133,7 +133,11 @@ export const deleteMeet = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const meet = await Meet.findById(id);
   if (!meet) throw new ApiError(404, 'Meet not found');
-  if (!meet.organizer.equals(req.user._id)) throw new ApiError(403, 'Not allowed');
+  // allow organizer or an attendee (by email) to cancel
+  const requestingUser = await User.findById(req.user._id).select('email');
+  const isOrganizer = meet.organizer && meet.organizer.equals && meet.organizer.equals(req.user._id);
+  const isAttendee = Array.isArray(meet.attendees) && requestingUser && meet.attendees.includes(requestingUser.email);
+  if (!isOrganizer && !isAttendee) throw new ApiError(403, 'Not allowed');
 
   // attempt to delete calendar event
   if (meet.googleEventId) {
@@ -156,4 +160,83 @@ export const deleteMeet = asyncHandler(async (req, res) => {
 
   await meet.deleteOne();
   return res.status(200).json(new ApiResponse(200, {}, 'Meet deleted'));
+});
+
+export const rescheduleMeet = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { date, time, duration } = req.body;
+
+  if (!date || !time || !duration) throw new ApiError(400, 'date, time and duration are required');
+
+  const meet = await Meet.findById(id);
+  if (!meet) throw new ApiError(404, 'Meet not found');
+  // allow organizer or an attendee to reschedule
+  const requestingUser = await User.findById(req.user._id).select('email');
+  const isOrganizer = meet.organizer && meet.organizer.equals && meet.organizer.equals(req.user._id);
+  const isAttendee = Array.isArray(meet.attendees) && requestingUser && meet.attendees.includes(requestingUser.email);
+  if (!isOrganizer && !isAttendee) throw new ApiError(403, 'Not allowed');
+
+  const dateTime = new Date(`${date}T${time}:00`);
+  if (isNaN(dateTime.getTime())) throw new ApiError(400, 'Invalid date/time');
+
+  // Update meet fields
+  meet.dateAndTime = dateTime;
+  meet.durationInMinutes = duration;
+  await meet.save();
+
+  // If there is a pre-created session for this meet that is not completed, update it
+  try {
+    const session = await Session.findOne({ meet: meet._id, completed: false });
+    if (session) {
+      session.date = dateTime;
+      session.durationInMinutes = duration;
+      await session.save();
+    }
+  } catch (err) {
+    console.error('Failed to update linked session during reschedule:', err);
+  }
+
+  // Attempt to update calendar/zoom by deleting old and recreating if possible
+  try {
+    const user = await User.findById(req.user._id);
+    if (meet.googleEventId && (user.googleRefreshToken || user.googleAccessToken)) {
+      try {
+        await deleteGoogleCalendarEvent(user, meet.googleEventId);
+      } catch (e) {
+        console.error('Failed to delete old Google event during reschedule:', e);
+      }
+      try {
+        const event = await createGoogleCalendarEvent(user, meet);
+        if (event && event.id) {
+          meet.googleEventId = event.id;
+          meet.googleEventHtmlLink = event.htmlLink || meet.googleEventHtmlLink;
+          await meet.save();
+        }
+      } catch (e) {
+        console.error('Failed to create new Google event during reschedule:', e);
+      }
+    }
+
+    if (meet.zoomMeetingId) {
+      try {
+        await deleteZoomMeeting(meet.zoomMeetingId);
+      } catch (e) {
+        console.error('Failed to delete old Zoom meeting during reschedule:', e);
+      }
+      try {
+        const z = await createZoomMeeting(meet);
+        if (z && z.id) {
+          meet.zoomMeetingId = z.id;
+          meet.zoomJoinUrl = z.join_url || meet.zoomJoinUrl;
+          await meet.save();
+        }
+      } catch (e) {
+        console.error('Failed to create new Zoom meeting during reschedule:', e);
+      }
+    }
+  } catch (err) {
+    console.error('Calendar/Zoom reschedule helpers failed:', err);
+  }
+
+  return res.status(200).json(new ApiResponse(200, meet, 'Meet rescheduled'));
 });
