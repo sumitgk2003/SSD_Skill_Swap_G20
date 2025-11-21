@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import client from '../api/client';
 
 const AdminPage = () => {
   const pageStyle = {
@@ -90,6 +91,42 @@ const AdminPage = () => {
     fontWeight: 'bold',
   };
 
+  // Dynamic stats
+  const [totalUsers, setTotalUsers] = useState(null);
+  const [totalSkills, setTotalSkills] = useState(null);
+  const [totalMatches, setTotalMatches] = useState(null);
+  // disputes backend not implemented yet; keep null until available
+  const [disputesCount, setDisputesCount] = useState(null);
+
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const [usersRes, skillsRes] = await Promise.all([
+          client.get('/admin/users'),
+          client.get('/admin/skills'),
+        ]);
+
+        const users = usersRes?.data?.data || [];
+        const skills = skillsRes?.data?.data || [];
+
+        setTotalUsers(Array.isArray(users) ? users.length : 0);
+        setTotalSkills(Array.isArray(skills) ? skills.length : 0);
+
+        const matchesSum = Array.isArray(skills)
+          ? skills.reduce((acc, s) => acc + (s.matchesCount || 0), 0)
+          : 0;
+        setTotalMatches(matchesSum);
+      } catch (err) {
+        console.error('Failed to fetch admin stats', err);
+        setTotalUsers(0);
+        setTotalSkills(0);
+        setTotalMatches(0);
+      }
+    };
+
+    fetchCounts();
+  }, []);
+
   return (
     <div style={pageStyle}>
       <div style={cardStyle}>
@@ -97,54 +134,37 @@ const AdminPage = () => {
         <p style={paragraphStyle}>
           Welcome to the administration panel. From here, you can manage users, skills, and other application settings.
         </p>
-
         <div style={statsContainerStyle}>
-          <div style={statCardStyle}>
-            <h3 style={statCardHeadingStyle}>Total Users</h3>
-            <p style={statCardValueStyle}>1,234</p>
-          </div>
-          <div style={statCardStyle}>
-            <h3 style={statCardHeadingStyle}>Total Skills</h3>
-            <p style={statCardValueStyle}>567</p>
-          </div>
-          <div style={statCardStyle}>
-            <h3 style={statCardHeadingStyle}>Total Matches</h3>
-            <p style={statCardValueStyle}>890</p>
-          </div>
-          <div style={statCardStyle}>
-            <h3 style={statCardHeadingStyle}>Disputes</h3>
-            <p style={statCardValueStyle}>12</p>
-          </div>
+          <Link to="/admin/users" style={{ textDecoration: 'none' }} aria-label="Go to admin users">
+            <div style={statCardStyle}>
+              <h3 style={statCardHeadingStyle}>Total Users</h3>
+              <p style={statCardValueStyle}>{/* dynamic value */ totalUsers ?? '—'}</p>
+            </div>
+          </Link>
+
+          <Link to="/admin/skills" style={{ textDecoration: 'none' }} aria-label="Go to admin skills">
+            <div style={statCardStyle}>
+              <h3 style={statCardHeadingStyle}>Total Skills</h3>
+              <p style={statCardValueStyle}>{/* dynamic value */ totalSkills ?? '—'}</p>
+            </div>
+          </Link>
+
+          <Link to="/admin/skills" style={{ textDecoration: 'none' }} aria-label="Go to admin skills matches">
+            <div style={statCardStyle}>
+              <h3 style={statCardHeadingStyle}>Total Matches</h3>
+              <p style={statCardValueStyle}>{/* dynamic value */ totalMatches ?? '—'}</p>
+            </div>
+          </Link>
+
+          <Link to="/admin/disputes" style={{ textDecoration: 'none' }} aria-label="Go to admin disputes">
+            <div style={statCardStyle}>
+              <h3 style={statCardHeadingStyle}>Disputes</h3>
+              <p style={statCardValueStyle}>{/* keep placeholder until backend exists */ disputesCount ?? '—'}</p>
+            </div>
+          </Link>
         </div>
 
         <div style={buttonContainerStyle}>
-          <Link
-            to="/admin/users"
-            style={buttonStyle}
-            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = buttonHoverStyle.backgroundColor)}
-            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = buttonStyle.backgroundColor)}
-          >
-            Manage Users
-          </Link>
-
-          <Link
-            to="/admin/skills"
-            style={buttonStyle}
-            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = buttonHoverStyle.backgroundColor)}
-            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = buttonStyle.backgroundColor)}
-          >
-            Manage Skills
-          </Link>
-
-          <Link
-            to="/admin/disputes"
-            style={buttonStyle}
-            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = buttonHoverStyle.backgroundColor)}
-            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = buttonStyle.backgroundColor)}
-          >
-            Manage Disputes
-          </Link>
-
           <Link
             to="/admin/policy"
             style={buttonStyle}

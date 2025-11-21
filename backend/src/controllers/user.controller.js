@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Match } from "../models/match.model.js";
+import mongoose from "mongoose";
 
 export const options = {
   httpOnly: true,
@@ -349,6 +350,10 @@ const getConnectedUsers = asyncHandler(async (req, res) => {
   .populate("user2", "name email bio"); // Populate recipient details
   
   const formattedConnections = connections.map((match) => {
+    if (!match.user1 || !match.user2) {
+      console.warn(`Match ${match._id} has a broken user reference. Skipping.`);
+      return null;
+    }
     const isSender = match.user1._id.toString() === userId.toString();
 
     const partner = isSender ? match.user2 : match.user1;
@@ -362,7 +367,7 @@ const getConnectedUsers = asyncHandler(async (req, res) => {
       skill_i_learn: skillILearn, // What you are gaining
       connected_since: match.updatedAt
     };
-  });
+  }).filter(Boolean); // Remove nulls from broken references
 
   return res
     .status(200)
@@ -470,6 +475,10 @@ const getAllConnections = asyncHandler(async (req, res) => {
 
   // Format the matches to be more readable
   const formattedMatches = matches.map((match) => {
+    if (!match.user1 || !match.user2) {
+      console.warn(`Match ${match._id} has a broken user reference. Skipping.`);
+      return null;
+    }
     const isCurrentUser1 = match.user1._id.toString() === userId.toString();
     const partner = isCurrentUser1 ? match.user2 : match.user1;
     const currentUserSkill = isCurrentUser1 ? match.skill1 : match.skill2;
@@ -488,11 +497,31 @@ const getAllConnections = asyncHandler(async (req, res) => {
       created_at: match.createdAt,
       updated_at: match.updatedAt,
     };
-  });
+  }).filter(Boolean); // remove nulls
 
   return res
     .status(200)
     .json(new ApiResponse(200, formattedMatches, "All matches fetched successfully"));
+});
+
+const getUserProfileById = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(400, "Invalid user ID");
+  }
+
+  const userProfile = await User.findById(userId).select(
+    "name email bio skills interests avatar createdAt"
+  );
+
+  if (!userProfile) {
+    throw new ApiError(404, "User not found");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, userProfile, "User profile fetched successfully"));
 });
 
 
@@ -507,6 +536,7 @@ export {
   getConnectedUsers,
   respondRequest,
   getAllSkills, // Export the new function
-  getAllConnections // Export the new function
+  getAllConnections, // Export the new function
+  getUserProfileById
 };
 export { getCurrentUser };

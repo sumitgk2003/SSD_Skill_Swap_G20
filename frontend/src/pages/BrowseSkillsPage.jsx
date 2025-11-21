@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 
 const pillColors = [
@@ -69,7 +70,9 @@ const UserCard = ({ user, onConnect, connectionStatus }) => {
             <div>
                 <span style={pillStyle}>{interest}</span>
             </div>
-            <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-primary)', fontWeight: 'bold' }}>{user.name}</h3>
+            <Link to={`/user/${user.user_id}`} style={{textDecoration: 'none'}}>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-primary)', fontWeight: 'bold' }}>{user.name}</h3>
+            </Link>
             <p style={{ margin: 0, color: 'var(--text-secondary)', flexGrow: 1 }}>This user can teach you {interest} and is interested in learning one of your skills.</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
                 <span>Wants to learn: {user.skills_they_want.join(', ')}</span>

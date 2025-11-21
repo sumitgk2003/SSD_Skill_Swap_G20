@@ -1,4 +1,5 @@
 import { Admin } from "../models/admin.model.js";
+import { User } from "../models/user.model.js";
 
 
  export async function createAdmin(req, res) {
@@ -123,5 +124,79 @@ export async function loginAdmin(req, res) {
   } catch (err) {
     console.error("Login Error:", err);
     return res.status(500).json({ success: false, message: String(err.message) });
+  }
+}
+
+export async function getAllUsers(req, res) {
+  try {
+    // Return all users but exclude sensitive fields
+    const users = await User.find({}).select('-password -refreshToken -googleRefreshToken').lean();
+    return res.json({ success: true, data: users });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: String(err) });
+  }
+}
+
+
+// Admin: delete a user by id
+export async function deleteUserById(req, res) {
+  try {
+    const { id } = req.params;
+    const deleted = await User.findByIdAndDelete(id).lean();
+    if (!deleted) return res.status(404).json({ success: false, message: 'User not found' });
+    return res.json({ success: true, data: { id: deleted._id, email: deleted.email } });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: String(err) });
+  }
+}
+
+// Admin: delete a skill globally (remove from all users' skills arrays)
+// Admin: get skills with match counts (accepted matches)
+export async function getAdminSkills(req, res) {
+  try {
+    // 1. Get all unique skills from users (as earlier)
+    const allSkillsAgg = await User.aggregate([
+      { $project: { skills: 1, interests: 1 } },
+      { $group: { _id: null, uniqueSkills: { $addToSet: '$skills' }, uniqueInterests: { $addToSet: '$interests' } } },
+      { $project: { allUnique: { $concatArrays: ['$uniqueSkills', '$uniqueInterests'] } } }
+    ]);
+    const flattened = allSkillsAgg && allSkillsAgg.length ? [...new Set(allSkillsAgg[0].allUnique.flat())].filter(Boolean) : [];
+
+    // 2. Aggregate matches counts by skill from Match collection (accepted)
+    const { Match } = await import('../models/match.model.js');
+    const matchAgg = await Match.aggregate([
+      { $match: { status: 'accepted' } },
+      { $project: { skills: ['$skill1', '$skill2'] } },
+      { $unwind: '$skills' },
+      { $group: { _id: '$skills', count: { $sum: 1 } } },
+      { $project: { _id: 0, skill: '$_id', matchesCount: '$count' } }
+    ]);
+
+    const countsMap = new Map();
+    for (const m of matchAgg) countsMap.set(m.skill, m.matchesCount || 0);
+
+    const result = flattened.map((s) => ({ skill: s, matchesCount: countsMap.get(s) || 0 }));
+    // sort descending by matches
+    result.sort((a, b) => b.matchesCount - a.matchesCount);
+
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: String(err) });
+  }
+}
+
+// Admin logout - clear refresh token and cookies
+export async function logoutAdmin(req, res) {
+  try {
+    const adminId = req.user?._id;
+    if (!adminId) return res.status(400).json({ success: false, message: 'Invalid admin' });
+    await Admin.findByIdAndUpdate(adminId, { $set: { refreshToken: undefined } }, { new: true });
+    const options = {
+      httpOnly: true,
+      secure: true,
+    };
+    return res.status(200).clearCookie('accessToken', options).clearCookie('refreshToken', options).json({ success: true, message: 'Admin logged out' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: String(err) });
   }
 }
