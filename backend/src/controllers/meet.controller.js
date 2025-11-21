@@ -129,6 +129,6 @@ export const deleteMeet = asyncHandler(async (req, res) => {
     }
   }
 
-  await meet.remove();
+  await meet.deleteOne();
   return res.status(200).json(new ApiResponse(200, {}, 'Meet deleted'));
 });
