@@ -35,6 +35,11 @@ export const createSession = asyncHandler(async (req, res) => {
     throw new ApiError(403, 'Only a session participant may record the session');
   }
 
+  // If a rating is provided, only allow the learner (not the tutor) to submit it
+  if (rating && String(requesterId) !== String(learnerId)) {
+    throw new ApiError(403, 'Only the learner may submit a rating for the session');
+  }
+
   // If meetId provided, ensure both tutor and learner were participants of that meet
   if (meetId) {
     if (!mongoose.Types.ObjectId.isValid(meetId)) throw new ApiError(400, 'Invalid meetId');
@@ -78,6 +83,33 @@ export const createSession = asyncHandler(async (req, res) => {
     if (!existing) throw new ApiError(403, 'No accepted match exists between tutor and learner');
   }
 
+  // If a meetId is provided, try to update an existing session for that meet instead of creating duplicate
+  if (meetId) {
+    const existing = await Session.findOne({ meet: meetId, tutor: tutorId, learner: learnerId });
+    if (existing) {
+      existing.date = new Date(date);
+      existing.durationInMinutes = durationInMinutes;
+      existing.completed = true;
+      if (rating) existing.rating = rating;
+      if (review) existing.review = review;
+      await existing.save();
+
+      // If a rating was provided, create a Review tied to this session.
+      if (rating && rating > 0) {
+        try {
+          const fromUser = requesterId;
+          const toUser = String(fromUser) === String(tutorId) ? learnerId : tutorId;
+          await Review.create({ session: existing._id, fromUser, toUser, rating, text: review || undefined });
+        } catch (err) {
+          console.error('Failed to create linked review for session:', err);
+        }
+      }
+
+      return res.status(200).json(new ApiResponse(200, existing, 'Session updated'));
+    }
+  }
+
+  // Otherwise create a new session record (marking it completed)
   const session = await Session.create({
     match: matchId || undefined,
     meet: meetId || undefined,
@@ -97,7 +129,6 @@ export const createSession = asyncHandler(async (req, res) => {
       const toUser = String(fromUser) === String(tutorId) ? learnerId : tutorId;
       await Review.create({ session: session._id, fromUser, toUser, rating, text: review || undefined });
     } catch (err) {
-      // don't block session creation on review write failure; log for now
       console.error('Failed to create linked review for session:', err);
     }
   }

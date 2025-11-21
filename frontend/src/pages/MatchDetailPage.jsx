@@ -354,6 +354,45 @@ const ChatSection = ({ matchId, matchUser, skillTitle }) => {
 const MeetingsSection = ({ matchId, matchUser }) => {
     const { user } = useSelector((state) => state.auth);
     const [meetings, setMeetings] = useState([]);
+    const [sessions, setSessions] = useState([]);
+    // Mark-complete modal state (moved here so handlers are in same scope)
+    const [completeModalOpen, setCompleteModalOpen] = useState(false);
+    const [currentMeetingToComplete, setCurrentMeetingToComplete] = useState(null);
+    const [markRating, setMarkRating] = useState(5);
+    const [markReview, setMarkReview] = useState('');
+    const [submittingMark, setSubmittingMark] = useState(false);
+
+    // Local modal styles (input/textarea/button) used by the Mark Complete modal
+    const styles = {
+        input: {
+            width: '100%',
+            padding: '0.6rem',
+            borderRadius: 8,
+            border: '1px solid var(--border-color)',
+            background: 'var(--background-primary)',
+            color: 'var(--text-primary)',
+            fontSize: '1rem',
+        },
+        textarea: {
+            width: '100%',
+            minHeight: 120,
+            padding: '0.6rem',
+            borderRadius: 8,
+            border: '1px solid var(--border-color)',
+            background: 'var(--background-primary)',
+            color: 'var(--text-primary)',
+            fontSize: '0.95rem',
+        },
+        button: {
+            padding: '0.5rem 0.9rem',
+            borderRadius: 8,
+            border: 'none',
+            background: 'var(--accent-primary)',
+            color: '#fff',
+            cursor: 'pointer',
+            fontWeight: 700,
+        }
+    };
     const [loading, setLoading] = useState(false);
     const [filterType, setFilterType] = useState('all'); // 'all', 'online', 'inperson'
     const [deleting, setDeleting] = useState(null); // track which meet is being deleted
@@ -366,6 +405,7 @@ const MeetingsSection = ({ matchId, matchUser }) => {
     const [date, setDate] = useState('');
     const [time, setTime] = useState('');
     const [duration, setDuration] = useState(30);
+    const [scheduledRole, setScheduledRole] = useState('teach'); // 'teach' or 'learn'
     const [errors, setErrors] = useState(null);
     const [confirmation, setConfirmation] = useState('');
 
@@ -419,6 +459,32 @@ const MeetingsSection = ({ matchId, matchUser }) => {
         fetchMeetings();
     }, [matchId, user._id]);
 
+    // Sessions (completed) fetching - refresh when a new session is created
+    const fetchSessions = async () => {
+        try {
+            const res = await axios.get('http://localhost:8000/api/v1/sessions/me', { withCredentials: true });
+            if (res.data && res.data.success) {
+                const all = res.data.data || [];
+                const filtered = all.filter(s => {
+                    const matchMatches = s.match && String(s.match) === String(matchId);
+                    const partnerMatches = String(s.tutor?._id || s.tutor) === String(matchUser?._id) || String(s.learner?._id || s.learner) === String(matchUser?._id);
+                    return matchMatches || partnerMatches;
+                });
+                setSessions(filtered.sort((a,b)=> new Date(b.date) - new Date(a.date)));
+            }
+        } catch (err) {
+            console.error('Error fetching sessions:', err);
+            setSessions([]);
+        }
+    };
+
+    useEffect(() => { fetchSessions(); }, [matchId]);
+    useEffect(() => {
+        const handler = () => { fetchSessions(); fetchMeetings(); };
+        window.addEventListener('sessionCreated', handler);
+        return () => window.removeEventListener('sessionCreated', handler);
+    }, []);
+
     const handleJoin = (joinUrl) => {
         if (!joinUrl) return;
         window.open(joinUrl, '_blank', 'noopener,noreferrer');
@@ -429,62 +495,49 @@ const MeetingsSection = ({ matchId, matchUser }) => {
     };
 
     const handleMarkComplete = async (meeting) => {
+        // Open the modal and set current meeting/session context. Modal enforces learner-only check before submit.
+        const session = sessions && sessions.find(s => s.meet && String(s.meet) === String(meeting.id));
+        if (!session) return alert('No scheduled session exists for this meeting.');
+        const currentUserId = user?._id || user?.id;
+        const sessionLearnerId = session.learner?._id || session.learner;
+        if (String(sessionLearnerId) !== String(currentUserId)) {
+            return alert('Only the learner may mark this session as complete');
+        }
+
+        setCurrentMeetingToComplete({ meeting, session });
+        setMarkRating(5);
+        setMarkReview('');
+        setCompleteModalOpen(true);
+    };
+
+    const submitMarkComplete = async () => {
+        if (!currentMeetingToComplete) return;
+        setSubmittingMark(true);
         try {
-            const role = window.prompt('Did you teach or learn in this session? (enter "teach" or "learn")', 'teach');
-            if (!role) return;
-            const normalized = role.trim().toLowerCase();
-            if (!['teach', 'learn'].includes(normalized)) return alert('Please enter "teach" or "learn"');
-
-            const rating = window.prompt('Optional: rate this session 1-5 (leave blank to skip)');
-            let ratingNum = undefined;
-            if (rating && rating.trim() !== '') {
-                ratingNum = Number(rating);
-                if (Number.isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
-                    return alert('Rating must be a number between 1 and 5');
-                }
-            }
-
-            const currentUserId = user?._id || user?.id;
-            const partnerId = matchUser?._id || matchUser?.id;
-            const tutorId = normalized === 'teach' ? currentUserId : partnerId;
-            const learnerId = normalized === 'teach' ? partnerId : currentUserId;
-
-            // Debug: log resolved participant ids
-            console.log('Resolved participant ids', { currentUserId, partnerId, tutorId, learnerId });
-
-            const dateIso = meeting.date && meeting.time ? `${meeting.date}T${meeting.time}:00Z` : null;
-
+            const { meeting, session } = currentMeetingToComplete;
             const payload = {
                 meetId: meeting.id,
-                tutorId,
-                learnerId,
-                date: dateIso,
-                durationInMinutes: meeting.duration || 30,
-                rating: ratingNum,
+                tutorId: session.tutor?._id || session.tutor,
+                learnerId: session.learner?._id || session.learner,
+                date: session.date || (meeting.date && meeting.time ? `${meeting.date}T${meeting.time}:00Z` : new Date().toISOString()),
+                durationInMinutes: session.durationInMinutes || meeting.duration || 30,
+                rating: markRating || undefined,
+                review: markReview || undefined,
             };
 
-            // Validate required fields before sending
-            if (!payload.tutorId || !payload.learnerId || !payload.date || !payload.durationInMinutes) {
-                console.error('Cannot submit session, missing required fields', payload);
-                return alert('Unable to record session: missing required information (tutor, learner, date or duration)');
-            }
-
-            // Debug: log payload before sending
-            console.log('Submitting session payload', payload);
-
             const res = await axios.post('http://localhost:8000/api/v1/sessions/complete', payload, { withCredentials: true });
-
-            // Debug: log response
-            console.log('sessions/complete response', res?.data, res?.status);
-
-            if (res.data && res.data.success) {
-                alert('Session recorded');
+            if (res.data && (res.data.success || res.status === 200)) {
+                setCompleteModalOpen(false);
+                setCurrentMeetingToComplete(null);
+                try { window.dispatchEvent(new Event('sessionCreated')); } catch(e){}
             } else {
                 alert('Failed to record session');
             }
         } catch (err) {
-            console.error('Error marking session complete:', err, err?.response?.data || null);
-            alert(err.response?.data?.message || err.message || 'Failed');
+            console.error('Submit mark complete failed', err);
+            alert(err.response?.data?.message || err.message || 'Failed to submit');
+        } finally {
+            setSubmittingMark(false);
         }
     };
 
@@ -526,6 +579,7 @@ const MeetingsSection = ({ matchId, matchUser }) => {
             time,
             duration,
             with: matchUser ? { id: matchUser._id, name: matchUser.name, email: matchUser.email } : null,
+            role: scheduledRole, // 'teach' or 'learn' - tells server who will be tutor/learner
         };
         return payload;
     };
@@ -544,6 +598,8 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                 setTitle(''); setDate(''); setTime(''); setDuration(30);
                 // refresh meetings
                 await fetchMeetings();
+                // if server pre-created a session (based on role), refresh sessions too
+                try { if (res.data.data && res.data.data.session) await fetchSessions(); } catch(e) { }
                 setTimeout(() => setConfirmation(''), 5000);
             } else {
                 throw new Error(res.data?.message || 'Failed to create meeting');
@@ -706,6 +762,11 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                             <button type="button" onClick={() => setMeetType('online')} style={{ padding: '0.5rem 0.9rem', borderRadius: 10, border: meetType === 'online' ? 'none' : '1px solid var(--border-color)', background: meetType === 'online' ? 'var(--accent-primary)' : 'transparent', color: meetType === 'online' ? '#fff' : 'var(--text-primary)', fontWeight: 700, cursor: 'pointer' }}>Online</button>
                             <button type="button" onClick={() => setMeetType('inperson')} style={{ padding: '0.5rem 0.9rem', borderRadius: 10, border: meetType === 'inperson' ? 'none' : '1px solid var(--border-color)', background: meetType === 'inperson' ? 'var(--accent-primary)' : 'transparent', color: meetType === 'inperson' ? '#fff' : 'var(--text-primary)', fontWeight: 700, cursor: 'pointer' }}>In person</button>
                         </div>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginRight: 6 }}>I am</div>
+                            <button type="button" onClick={() => setScheduledRole('teach')} style={{ padding: '0.4rem 0.7rem', borderRadius: 8, border: scheduledRole === 'teach' ? 'none' : '1px solid var(--border-color)', background: scheduledRole === 'teach' ? 'var(--accent-primary)' : 'transparent', color: scheduledRole === 'teach' ? '#fff' : 'var(--text-primary)', fontWeight: 700, cursor: 'pointer' }}>Teaching</button>
+                            <button type="button" onClick={() => setScheduledRole('learn')} style={{ padding: '0.4rem 0.7rem', borderRadius: 8, border: scheduledRole === 'learn' ? 'none' : '1px solid var(--border-color)', background: scheduledRole === 'learn' ? 'var(--accent-primary)' : 'transparent', color: scheduledRole === 'learn' ? '#fff' : 'var(--text-primary)', fontWeight: 700, cursor: 'pointer' }}>Learning</button>
+                        </div>
                         <input placeholder="Title (optional)" value={title} onChange={(e) => setTitle(e.target.value)} style={{ flex: 1, padding: '0.6rem', borderRadius: 10, border: '1px solid var(--border-color)', minWidth: 200 }} />
                         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
                             <button type="button" onClick={() => { setDate(''); setTime(''); setDuration(30); setTitle(''); setNote(''); }} style={{ padding: '0.45rem 0.75rem', borderRadius: 8, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)' }}>Reset</button>
@@ -792,7 +853,14 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                             if (filterType === 'inperson') return meeting.type === 'inperson';
                             return true;
                         })
-                        .map((meeting) => (
+                        .map((meeting) => {
+                            const isOrganizer = String(meeting.organizer) === String(user?._id || user?.id);
+                            const isAttendee = Array.isArray(meeting.attendees) && meeting.attendees.includes(user?.email);
+                            const isParticipant = isOrganizer || isAttendee;
+                            const completedSession = sessions && sessions.find(s => s.meet && String(s.meet) === String(meeting.id));
+                            const isCompleted = Boolean(completedSession && (completedSession.completed === true));
+
+                            return (
                             <div key={meeting.id} style={meetingCardStyle}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
                                     <div style={meetingInfoStyle}>
@@ -901,7 +969,7 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                                             <img src={calendarLogo} alt="Calendar" style={{ width: '40px', height: '40px' }} />
                                         </button>
                                     )}
-                                    {String(meeting.organizer) === String(user?.id || user?._id) && (
+                                    {isOrganizer && !isCompleted && (
                                         <button
                                             style={{
                                                 padding: '0.6rem 1.2rem',
@@ -927,8 +995,8 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                                             {deleting === meeting.id ? 'Canceling...' : 'Cancel'}
                                         </button>
                                     )}
-                                    {/* Mark Complete - visible to participants */}
-                                    {(String(meeting.organizer) === String(user?._id || user?.id) || (meeting.attendees && meeting.attendees.includes(user?.email))) && (
+                                    {/* Mark Complete - visible to participants and only when not already completed */}
+                                    {completedSession && !completedSession.completed && String(completedSession.learner?._id || completedSession.learner) === String(user?._id || user?.id) && (
                                         <button
                                             style={{
                                                 padding: '0.6rem 1.2rem',
@@ -946,15 +1014,76 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                                             Mark Complete
                                         </button>
                                     )}
+
+                                    {/* Completed badge when a session exists for this meet */}
+                                    {isCompleted && (
+                                        <div style={{
+                                            padding: '0.5rem 0.8rem',
+                                            borderRadius: 8,
+                                            background: '#d1e7dd',
+                                            color: '#0f5132',
+                                            fontWeight: 700,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            minWidth: 96
+                                        }}>
+                                            <div>Completed</div>
+                                        </div>
+                                    )}
                                 </div>
                                 </div>
+
+                                {/* Inline rating & review for this meeting's completed session */}
+                                {isCompleted && completedSession && (
+                                    <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed var(--border-color)' }}>
+                                        {completedSession.rating != null && (
+                                            <div style={{ color: 'var(--text-primary)', fontWeight: 700, marginBottom: '0.25rem' }}>
+                                                Rating: {completedSession.rating} ★
+                                            </div>
+                                        )}
+                                        {completedSession.review && (
+                                            <div style={{ color: 'var(--text-secondary)' }}>{completedSession.review}</div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                        ))}
+                        );
+                        })
+                    }
+                </div>
+                
+            )}
+
+            
+            {/* Mark Complete Modal (local to MeetingsSection) */}
+            {completeModalOpen && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+                    <div style={{ width: 'min(640px, 95%)', background: 'var(--background-primary)', padding: '1.25rem', borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}>
+                        <h3 style={{ marginTop:0 }}>Mark session complete</h3>
+                        <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>Only the learner can mark a scheduled session complete and submit a rating.</p>
+                        <div style={{ margin: '0.5rem 0' }}>
+                            <label style={{ display: 'block', marginBottom: '0.25rem' }}>Rating</label>
+                            <select value={markRating} onChange={(e) => setMarkRating(Number(e.target.value))} style={styles.input}>
+                                {[5,4,3,2,1].map(n => <option key={n} value={n}>{n} ★</option>)}
+                            </select>
+                        </div>
+                        <div style={{ margin: '0.5rem 0' }}>
+                            <label style={{ display: 'block', marginBottom: '0.25rem' }}>Comments</label>
+                            <textarea value={markReview} onChange={(e) => setMarkReview(e.target.value)} style={styles.textarea} />
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                            <button onClick={() => { setCompleteModalOpen(false); setCurrentMeetingToComplete(null); }} style={{ ...styles.button, background: 'var(--background-secondary)', color: 'var(--text-primary)' }}>Cancel</button>
+                            <button onClick={submitMarkComplete} disabled={submittingMark} style={{ ...styles.button }}>{submittingMark ? 'Submitting...' : 'Mark Complete'}</button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
     );
 };
+
+
 
 // Main MatchDetailPage Component
 const MatchDetailPage = () => {
@@ -1169,9 +1298,36 @@ const MatchDetailPage = () => {
                     >
                         📅 Meetings
                     </button>
+                    
                 </div>
 
                 <div style={sectionStyle}>
+                    {/* Review Modal */}
+                    {reviewModalOpen && (
+                        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+                            <div style={{ width: 'min(720px, 95%)', background: 'var(--background-primary)', padding: '1.5rem', borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}>
+                                <h3 style={{ marginTop:0 }}>Leave a review for {matchData.partner.name}</h3>
+                                <div style={{ margin: '0.5rem 0' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.25rem' }}>Rating</label>
+                                    <select value={reviewRating} onChange={(e) => setReviewRating(Number(e.target.value))} style={styles.input}>
+                                        {[5,4,3,2,1].map(n => <option key={n} value={n}>{n} ★</option>)}
+                                    </select>
+                                </div>
+                                <div style={{ margin: '0.5rem 0' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.25rem' }}>Comments</label>
+                                    <textarea value={reviewText} onChange={(e) => setReviewText(e.target.value)} style={styles.textarea} />
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                    <button onClick={() => setReviewModalOpen(false)} style={{ ...styles.button, background: 'var(--background-secondary)', color: 'var(--text-primary)' }}>Cancel</button>
+                                    <button onClick={submitReview} disabled={submittingReview} style={{ ...styles.button }}>{submittingReview ? 'Submitting...' : 'Submit Review'}</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    
+
+                    
                     {activeTab === 'chat' && (
                         <ChatSection
                             matchId={matchId}
@@ -1185,6 +1341,7 @@ const MatchDetailPage = () => {
                             matchUser={matchData.partner}
                         />
                     )}
+                    
                 </div>
             </div>
         </div>
