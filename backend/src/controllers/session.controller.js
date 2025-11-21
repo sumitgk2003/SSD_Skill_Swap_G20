@@ -153,13 +153,14 @@ export const getMySummary = asyncHandler(async (req, res) => {
   const userId = req.user._id;
 
   // Hours taught and learned
+  // Only include sessions that were marked completed (so hours are counted only after marking complete)
   const taughtAgg = await Session.aggregate([
-    { $match: { tutor: new mongoose.Types.ObjectId(userId) } },
+    { $match: { tutor: new mongoose.Types.ObjectId(userId), completed: true } },
     { $group: { _id: null, totalMinutes: { $sum: "$durationInMinutes" }, count: { $sum: 1 }, avgRating: { $avg: "$rating" } } }
   ]);
 
   const learnedAgg = await Session.aggregate([
-    { $match: { learner: new mongoose.Types.ObjectId(userId) } },
+    { $match: { learner: new mongoose.Types.ObjectId(userId), completed: true } },
     { $group: { _id: null, totalMinutes: { $sum: "$durationInMinutes" }, count: { $sum: 1 } } }
   ]);
 
@@ -171,7 +172,8 @@ export const getMySummary = asyncHandler(async (req, res) => {
   const learnedCount = (learnedAgg[0] && learnedAgg[0].count) || 0;
 
   // Current streak: count consecutive days ending today with at least one completed session (as tutor or learner)
-  const sessions = await Session.find({ $or: [{ tutor: userId }, { learner: userId }] }).select('date').sort({ date: -1 }).lean();
+  // Use only completed sessions for streak and recent activity
+  const sessions = await Session.find({ $or: [{ tutor: userId }, { learner: userId }], completed: true }).select('date').sort({ date: -1 }).lean();
   let streak = 0;
   if (sessions && sessions.length > 0) {
     const msInDay = 24 * 60 * 60 * 1000;
