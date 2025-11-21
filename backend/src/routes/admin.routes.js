@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createAdmin, populateAdminSkills, getAdmin } from "../controllers/admin.controller.js";
+import { createAdmin, populateAdminSkills, getAdmin, loginAdmin } from "../controllers/admin.controller.js";
 
 const router = Router();
 
@@ -11,5 +11,6 @@ router.post("/populate-skills", populateAdminSkills);
 
 // Get admin info (optional query ?email=)
 router.get("/", getAdmin);
+router.post("/login", loginAdmin);
 
 export default router;
