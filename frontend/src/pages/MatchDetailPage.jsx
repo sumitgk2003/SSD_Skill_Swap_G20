@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
 import { io } from 'socket.io-client';
+import zoomLogo from '../assets/zoom-logo.svg';
+import calendarLogo from '../assets/calendar-logo.svg';
 
 // Message Component with Enhanced UI - Theme Aware
 const MessageBubble = ({ message, isOwn, senderName }) => {
@@ -353,6 +355,9 @@ const MeetingsSection = ({ matchId, matchUser }) => {
     const { user } = useSelector((state) => state.auth);
     const [meetings, setMeetings] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [filterType, setFilterType] = useState('all'); // 'all', 'online', 'inperson'
+    const [deleting, setDeleting] = useState(null); // track which meet is being deleted
+    const [confirmDialog, setConfirmDialog] = useState({ show: false, meetId: null }); // confirmation dialog state
 
     // scheduler state
     const [schedulerOpen, setSchedulerOpen] = useState(false);
@@ -381,6 +386,7 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                     id: m._id,
                     title: m.title || (m.meetType ? (m.meetType === 'online' ? 'Online Meeting' : 'In-Person Meeting') : 'Meeting'),
                     host: String(m.organizer._id || m.organizer) === String(user._id) ? 'You' : (m.organizerName || 'Host'),
+                    organizer: m.organizer._id || m.organizer,
                     type: m.meetType === 'online' ? 'online' : 'inperson',
                     date: new Date(m.dateAndTime).toISOString().slice(0, 10),
                     time: new Date(m.dateAndTime).toTimeString().slice(0, 5),
@@ -402,6 +408,34 @@ const MeetingsSection = ({ matchId, matchUser }) => {
     const handleJoin = (joinUrl) => {
         if (!joinUrl) return;
         window.open(joinUrl, '_blank', 'noopener,noreferrer');
+    };
+
+    const handleDeleteMeet = async (meetId) => {
+        setConfirmDialog({ show: true, meetId });
+    };
+
+    const confirmDeleteMeet = async (meetId) => {
+        setConfirmDialog({ show: false, meetId: null });
+        setDeleting(meetId);
+        try {
+            const res = await axios.delete(`http://localhost:8000/api/v1/meets/${meetId}`, {
+                withCredentials: true,
+            });
+            if (res.data?.success || res.status === 200) {
+                setMeetings((prev) => prev.filter((m) => m.id !== meetId));
+                setConfirmation('Meeting cancelled successfully');
+                setTimeout(() => setConfirmation(''), 3000);
+            }
+        } catch (error) {
+            console.error('Error deleting meet:', error);
+            alert(error.response?.data?.message || 'Failed to cancel meeting');
+        } finally {
+            setDeleting(null);
+        }
+    };
+
+    const cancelDeleteMeet = () => {
+        setConfirmDialog({ show: false, meetId: null });
     };
 
     const validateAndBuildPayload = () => {
@@ -500,6 +534,83 @@ const MeetingsSection = ({ matchId, matchUser }) => {
 
     return (
         <div>
+            {/* Confirmation Dialog */}
+            {confirmDialog.show && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                }}>
+                    <div style={{
+                        backgroundColor: 'var(--background-secondary)',
+                        borderRadius: '12px',
+                        padding: '2rem',
+                        maxWidth: '400px',
+                        width: '90%',
+                        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
+                        border: '1px solid var(--border-color)',
+                    }}>
+                        <h2 style={{ margin: '0 0 1rem 0', color: 'var(--text-primary)', fontSize: '1.25rem' }}>
+                            Cancel Meeting?
+                        </h2>
+                        <p style={{ margin: '0 0 1.5rem 0', color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                            Are you sure you want to cancel this meeting? This action cannot be undone.
+                        </p>
+                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={cancelDeleteMeet}
+                                style={{
+                                    padding: '0.6rem 1.2rem',
+                                    backgroundColor: 'var(--background-primary)',
+                                    color: 'var(--text-primary)',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontWeight: '600',
+                                    transition: 'all 0.2s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.target.style.backgroundColor = 'var(--background-tertiary)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.target.style.backgroundColor = 'var(--background-primary)';
+                                }}
+                            >
+                                Keep Meeting
+                            </button>
+                            <button
+                                onClick={() => confirmDeleteMeet(confirmDialog.meetId)}
+                                style={{
+                                    padding: '0.6rem 1.2rem',
+                                    backgroundColor: '#dc3545',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontWeight: '600',
+                                    transition: 'all 0.2s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.target.style.backgroundColor = '#c82333';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.target.style.backgroundColor = '#dc3545';
+                                }}
+                            >
+                                Cancel Meeting
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Meetings</h3>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -543,6 +654,55 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                 </div>
             )}
 
+            {/* Filter buttons */}
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                <button
+                    onClick={() => setFilterType('all')}
+                    style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '20px',
+                        border: filterType === 'all' ? 'none' : '1px solid var(--border-color)',
+                        backgroundColor: filterType === 'all' ? 'var(--accent-primary)' : 'transparent',
+                        color: filterType === 'all' ? '#fff' : 'var(--text-primary)',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                    }}
+                >
+                    All
+                </button>
+                <button
+                    onClick={() => setFilterType('online')}
+                    style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '20px',
+                        border: filterType === 'online' ? 'none' : '1px solid var(--border-color)',
+                        backgroundColor: filterType === 'online' ? 'var(--accent-primary)' : 'transparent',
+                        color: filterType === 'online' ? '#fff' : 'var(--text-primary)',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                    }}
+                >
+                    🌐 Online
+                </button>
+                <button
+                    onClick={() => setFilterType('inperson')}
+                    style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '20px',
+                        border: filterType === 'inperson' ? 'none' : '1px solid var(--border-color)',
+                        backgroundColor: filterType === 'inperson' ? 'var(--accent-primary)' : 'transparent',
+                        color: filterType === 'inperson' ? '#fff' : 'var(--text-primary)',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                    }}
+                >
+                    📍 In Person
+                </button>
+            </div>
+
             {loading ? (
                 <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
                     Loading meetings...
@@ -553,37 +713,149 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                 </p>
             ) : (
                 <div>
-                    {meetings.map((meeting) => (
-                        <div key={meeting.id} style={meetingCardStyle}>
-                            <div style={meetingInfoStyle}>
-                                <h4 style={meetingTitleStyle}>{meeting.title}</h4>
-                                <p style={meetingDetailsStyle}>
-                                    <span style={pillStyle(meeting.type)}>
-                                        {meeting.type === 'online' ? '🌐 Online' : '📍 In-Person'}
-                                    </span>
-                                </p>
-                                <p style={meetingDetailsStyle}>
-                                    📅 {meeting.date} at {meeting.time}
-                                </p>
-                                <p style={meetingDetailsStyle}>
-                                    👤 {meeting.host}
-                                </p>
+                    {meetings
+                        .filter((meeting) => {
+                            if (filterType === 'all') return true;
+                            if (filterType === 'online') return meeting.type === 'online';
+                            if (filterType === 'inperson') return meeting.type === 'inperson';
+                            return true;
+                        })
+                        .map((meeting) => (
+                            <div key={meeting.id} style={meetingCardStyle}>
+                                <div style={meetingInfoStyle}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                        <h4 style={meetingTitleStyle}>{meeting.title}</h4>
+                                    
+                                    </div>
+                                    <p style={meetingDetailsStyle}>
+                                        <span style={pillStyle(meeting.type)}>
+                                            {meeting.type === 'online' ? '🌐 Online' : '📍 In-Person'}
+                                        </span>
+                                    </p>
+                                    <p style={meetingDetailsStyle}>
+                                        📅 {meeting.date} at {meeting.time}
+                                    </p>
+                                    <p style={meetingDetailsStyle}>
+                                        👤 {meeting.host}
+                                    </p>
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                                    {meeting.type === 'online' && meeting.joinUrl && (
+                                        <>
+                                            <button
+                                                style={{
+                                                    width: '48px',
+                                                    height: '48px',
+                                                    padding: 0,
+                                                    backgroundColor: 'transparent',
+                                                    border: 'none',
+                                                    cursor: 'pointer',
+                                                    borderRadius: '8px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    transition: 'all 0.2s ease',
+                                                }}
+                                                onClick={() => handleJoin(meeting.joinUrl)}
+                                                title="Join Zoom Meeting"
+                                                onMouseEnter={(e) => {
+                                                    e.target.style.backgroundColor = 'rgba(11, 92, 255, 0.1)';
+                                                    e.target.style.transform = 'scale(1.1)';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.target.style.backgroundColor = 'transparent';
+                                                    e.target.style.transform = 'scale(1)';
+                                                }}
+                                            >
+                                                <img src={zoomLogo} alt="Zoom" style={{ width: '40px', height: '40px' }} />
+                                            </button>
+                                            <button
+                                                style={{
+                                                    width: '48px',
+                                                    height: '48px',
+                                                    padding: 0,
+                                                    backgroundColor: 'transparent',
+                                                    border: 'none',
+                                                    cursor: 'pointer',
+                                                    borderRadius: '8px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    transition: 'all 0.2s ease',
+                                                }}
+                                                onClick={() => handleJoin(meeting.joinUrl)}
+                                                title="View Calendar Event"
+                                                onMouseEnter={(e) => {
+                                                    e.target.style.backgroundColor = 'rgba(66, 133, 244, 0.1)';
+                                                    e.target.style.transform = 'scale(1.1)';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.target.style.backgroundColor = 'transparent';
+                                                    e.target.style.transform = 'scale(1)';
+                                                }}
+                                            >
+                                                <img src={calendarLogo} alt="Calendar" style={{ width: '40px', height: '40px' }} />
+                                            </button>
+                                        </>
+                                    )}
+                                    {meeting.type === 'inperson' && meeting.joinUrl && (
+                                        <button
+                                            style={{
+                                                width: '48px',
+                                                height: '48px',
+                                                padding: 0,
+                                                backgroundColor: 'transparent',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                borderRadius: '8px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                transition: 'all 0.2s ease',
+                                            }}
+                                            onClick={() => handleJoin(meeting.joinUrl)}
+                                            title="View Calendar Event"
+                                            onMouseEnter={(e) => {
+                                                e.target.style.backgroundColor = 'rgba(66, 133, 244, 0.1)';
+                                                e.target.style.transform = 'scale(1.1)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.target.style.backgroundColor = 'transparent';
+                                                e.target.style.transform = 'scale(1)';
+                                            }}
+                                        >
+                                            <img src={calendarLogo} alt="Calendar" style={{ width: '40px', height: '40px' }} />
+                                        </button>
+                                    )}
+                                    {String(meeting.organizer) === String(user?.id || user?._id) && (
+                                        <button
+                                            style={{
+                                                padding: '0.6rem 1.2rem',
+                                                backgroundColor: '#dc3545',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                fontWeight: 'bold',
+                                                whiteSpace: 'nowrap',
+                                                opacity: deleting === meeting.id ? 0.6 : 1,
+                                                transition: 'all 0.2s ease',
+                                            }}
+                                            onClick={() => handleDeleteMeet(meeting.id)}
+                                            disabled={deleting === meeting.id}
+                                            onMouseEnter={(e) => {
+                                                if (deleting !== meeting.id) e.target.style.backgroundColor = '#c82333';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.target.style.backgroundColor = '#dc3545';
+                                            }}
+                                        >
+                                            {deleting === meeting.id ? 'Canceling...' : 'Cancel'}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
-                            <button
-                                style={joinBtnStyle}
-                                onClick={() => handleJoin(meeting.joinUrl)}
-                                disabled={!meeting.joinUrl}
-                                onMouseEnter={(e) => {
-                                    if (meeting.joinUrl) e.target.style.opacity = '0.9';
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (meeting.joinUrl) e.target.style.opacity = '1';
-                                }}
-                            >
-                                {meeting.joinUrl ? 'Join' : 'N/A'}
-                            </button>
-                        </div>
-                    ))}
+                        ))}
                 </div>
             )}
         </div>
