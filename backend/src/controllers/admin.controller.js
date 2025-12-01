@@ -109,8 +109,8 @@ export async function loginAdmin(req, res) {
     // 6. Return Response
     return res
       .status(200)
-      .cookie("accessToken", accessToken, options)
-      .cookie("refreshToken", refreshToken, options)
+      .cookie("adminAccessToken", accessToken, options)
+      .cookie("adminRefreshToken", refreshToken, options)
       .json({
         success: true,
         message: "Admin logged in successfully",
@@ -195,7 +195,10 @@ export async function logoutAdmin(req, res) {
       httpOnly: true,
       secure: true,
     };
-    return res.status(200).clearCookie('accessToken', options).clearCookie('refreshToken', options).json({ success: true, message: 'Admin logged out' });
+    return res.status(200)
+      .clearCookie('adminAccessToken', options)
+      .clearCookie('adminRefreshToken', options)
+      .json({ success: true, message: 'Admin logged out' });
   } catch (err) {
     return res.status(500).json({ success: false, message: String(err) });
   }
