@@ -135,12 +135,12 @@ const MatchCard = ({ match, type, onMatchClick }) => {
     const statusStyle = { margin: '0.5rem 0 0 0', color: 'var(--accent-primary)', fontSize: '0.85rem', fontWeight: 'bold' };
 
     return (
-        <div 
-            style={cardStyle}
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
-            onClick={() => onMatchClick(match._id)}
-        >
+      <div 
+        style={cardStyle}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onClick={() => onMatchClick(match)}
+      >
             <div style={headerStyle}>
                 <div style={avatarStyle}>{match.partner.name.charAt(0)}</div>
                 <div>
@@ -348,8 +348,15 @@ const DashboardPage = () => {
     respondToRequest(requestId, 'rejected');
   };
 
-  const handleSkillClick = (matchId) => {
-    navigate(`/match/${matchId}`);
+  const handleSkillClick = (match) => {
+    // Prevent navigation to chat/meetings for pending or rejected connections
+    const status = match?.status;
+    if (status && (status === 'pending' || status === 'rejected')) {
+      // No navigation; silently ignore or show a brief notice
+      alert('This connection is not active yet. Accept the request to open the chat/meetings.');
+      return;
+    }
+    navigate(`/match/${match._id}`);
   };
 
   const pageStyle = {

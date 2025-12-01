@@ -235,8 +235,18 @@ const CreateProfilePage = () => {
     setCurrentLearningSkills(userInterests || []);
     // load timezone and preferred formats from user slice if available
     const user = (window.__INITIAL_USER__ && window.__INITIAL_USER__) || null;
+    if (user && user.timezone) setTimezone(user.timezone);
     // Note: better approach is to pull timezone/preferredFormats from redux auth slice when available
   }, [userSkills, userInterests, userBio]);
+
+  // List of common IANA timezones for dropdown
+  const timezoneOptions = [
+    'UTC', 'Etc/UTC', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Madrid', 'Europe/Moscow',
+    'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Toronto', 'America/Vancouver',
+    'America/Sao_Paulo', 'America/Argentina/Buenos_Aires',
+    'Asia/Kolkata', 'Asia/Shanghai', 'Asia/Singapore', 'Asia/Tokyo', 'Asia/Seoul', 'Asia/Dubai', 'Asia/Jakarta',
+    'Australia/Sydney', 'Australia/Melbourne', 'Pacific/Auckland'
+  ];
 
   // 2. Filtering Logic
   const getSuggestions = (inputValue) => {
@@ -359,7 +369,12 @@ const CreateProfilePage = () => {
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Timezone</label>
-            <input type="text" value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder={Intl.DateTimeFormat().resolvedOptions().timeZone || 'e.g. Asia/Kolkata'} style={styles.input} />
+            <select value={timezone} onChange={(e) => setTimezone(e.target.value)} style={styles.input}>
+              <option value="">{Intl.DateTimeFormat().resolvedOptions().timeZone || 'Select your timezone'}</option>
+              {timezoneOptions.map(tz => (
+                <option key={tz} value={tz}>{tz}</option>
+              ))}
+            </select>
           </div>
 
           <div style={{ marginBottom: '1rem' }}>

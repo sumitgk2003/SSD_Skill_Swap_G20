@@ -206,9 +206,9 @@ const findMatches = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Interest parameter is required");
   }
 
-  // 3. Fetch the Current User to get their 'skills'
-  // (req.user only has _id, so we must fetch the full doc to see what skills they can offer)
-  const currentUser = await User.findById(userId).select("skills");
+  // 3. Fetch the Current User to get their 'skills' and availability
+  // (req.user only has _id, so we must fetch the full doc to see what skills and availability they provide)
+  const currentUser = await User.findById(userId).select("skills availability timezone");
   
   if (!currentUser) {
     throw new ApiError(404, "User not found");
@@ -235,10 +235,54 @@ const findMatches = asyncHandler(async (req, res) => {
     skills: interest,                         // Filter 1: They teach what user wants
     interests: { $in: currentUser.skills }    // Filter 2: They want what user teaches
   })
-  .select("name interests") 
+  .select("name interests availability timezone skills") 
   .lean();
 
-  const candidateIds = candidates.map(c => c._id);
+  // If the current user has provided availability, filter candidates by overlapping slots
+  const userAvailability = Array.isArray(currentUser.availability) ? currentUser.availability : [];
+
+  const timeToMinutes = (t) => {
+    if (!t || typeof t !== 'string') return null;
+    const parts = t.split(':');
+    if (parts.length < 2) return null;
+    const hh = Number(parts[0]);
+    const mm = Number(parts[1]);
+    if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+    return hh * 60 + mm;
+  };
+
+  const slotsOverlap = (a, b) => {
+    if (!a || !b) return false;
+    if (typeof a.dayOfWeek !== 'number' || typeof b.dayOfWeek !== 'number') return false;
+    if (a.dayOfWeek !== b.dayOfWeek) return false;
+    const aStart = timeToMinutes(a.start);
+    const aEnd = timeToMinutes(a.end);
+    const bStart = timeToMinutes(b.start);
+    const bEnd = timeToMinutes(b.end);
+    if ([aStart,aEnd,bStart,bEnd].some(v => v === null)) return false;
+    // overlap if latest start < earliest end
+    return Math.max(aStart, bStart) < Math.min(aEnd, bEnd);
+  };
+
+  let availabilityFiltered = candidates;
+  if (userAvailability.length > 0) {
+    availabilityFiltered = candidates.filter(candidate => {
+      const candAvail = Array.isArray(candidate.availability) ? candidate.availability : [];
+      if (candAvail.length === 0) return false;
+      for (const ua of userAvailability) {
+        for (const ca of candAvail) {
+          try {
+            if (slotsOverlap(ua, ca)) return true;
+          } catch (e) {
+            // ignore malformed slots
+          }
+        }
+      }
+      return false;
+    });
+  }
+
+  const candidateIds = availabilityFiltered.map(c => c._id);
   
   let ratingsMap = new Map();
 
@@ -254,7 +298,7 @@ const findMatches = asyncHandler(async (req, res) => {
   }
 
   // 6. Format the results
-  const matches = candidates.map((candidate) => {
+  const matches = availabilityFiltered.map((candidate) => {
     
     // Identify ALL skills of YOURS they are interested in
     const skillsTheyWant = candidate.interests.filter(candidateInterest => 
