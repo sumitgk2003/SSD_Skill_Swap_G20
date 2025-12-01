@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const pillColors = [
@@ -12,6 +12,7 @@ const pillColors = [
 
 // User Card Component
 const UserCard = ({ user, onConnect, connectionStatus }) => {
+    const navigate = useNavigate();
     const interest = user.matchedInterest;
     const pillColor = pillColors[user.user_id.charCodeAt(0) % pillColors.length];
 
@@ -25,6 +26,7 @@ const UserCard = ({ user, onConnect, connectionStatus }) => {
         gap: '1rem',
         transition: 'transform 0.2s ease, box-shadow 0.2s ease',
         textAlign: 'left',
+        cursor: 'pointer',
     };
     
     const [hovered, setHovered] = useState(false);
@@ -61,18 +63,34 @@ const UserCard = ({ user, onConnect, connectionStatus }) => {
         transition: 'all 0.2s ease-in-out',
     };
 
+    const handleCardClick = () => {
+        navigate(`/user/${user.user_id}`);
+    };
+
     return (
         <div 
             style={dynamicCardStyle}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
+            onClick={handleCardClick}
         >
             <div>
                 <span style={pillStyle}>{interest}</span>
             </div>
-            <Link to={`/user/${user.user_id}`} style={{textDecoration: 'none'}}>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-primary)', fontWeight: 'bold' }}>{user.name}</h3>
-            </Link>
+            <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-primary)', fontWeight: 'bold' }}>{user.name}</h3>
+            
+            {user.avgRating != null ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <span style={{ color: '#ffc107', fontSize: '1rem' }}>★</span>
+                    <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{user.avgRating.toFixed(1)}</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>({user.reviewCount} reviews)</span>
+                </div>
+            ) : (
+                <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', fontStyle: 'italic' }}>
+                    No ratings yet
+                </div>
+            )}
+
             <p style={{ margin: 0, color: 'var(--text-secondary)', flexGrow: 1 }}>This user can teach you {interest} and is interested in learning one of your skills.</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
                 <span>Wants to learn: {user.skills_they_want.join(', ')}</span>
