@@ -1169,6 +1169,7 @@ const MatchDetailPage = () => {
     const [reviewText, setReviewText] = useState('');
     const [reviewRating, setReviewRating] = useState(5);
     const [submittingReview, setSubmittingReview] = useState(false);
+    const [matchStats, setMatchStats] = useState({ totalTeachingHours: 0, totalLearningHours: 0 });
 
     // Add CSS animations
     useEffect(() => {
@@ -1230,6 +1231,8 @@ const MatchDetailPage = () => {
                         // fetch reviews for partner when we have match
                         fetchReviewsForUser(match.partner._id);
                         fetchAvgForUser(match.partner._id);
+                        // fetch match-specific stats
+                        fetchMatchStats();
                     } else {
                         console.error('Match not found');
                     }
@@ -1245,6 +1248,26 @@ const MatchDetailPage = () => {
             fetchMatchData();
         }
     }, [matchId, user]);
+
+    const fetchMatchStats = async () => {
+        try {
+            const res = await axios.get(`http://localhost:8000/api/v1/sessions/me/partner-history?matchId=${matchId}`, { withCredentials: true });
+            if (res.data && res.data.success) {
+                const sessions = res.data.data || [];
+                const totalTeachingHours = sessions
+                    .filter(s => String(s.tutor?._id || s.tutor) === String(user?._id || user?.id))
+                    .reduce((sum, s) => sum + (s.durationInMinutes || 0), 0) / 60;
+                const totalLearningHours = sessions
+                    .filter(s => String(s.learner?._id || s.learner) === String(user?._id || user?.id))
+                    .reduce((sum, s) => sum + (s.durationInMinutes || 0), 0) / 60;
+                
+                setMatchStats({ totalTeachingHours, totalLearningHours });
+            }
+        } catch (err) {
+            console.error('Error fetching match stats:', err);
+            setMatchStats({ totalTeachingHours: 0, totalLearningHours: 0 });
+        }
+    };
 
     const fetchReviewsForUser = async (userId) => {
         try {
@@ -1444,6 +1467,20 @@ const MatchDetailPage = () => {
                             </div>
                             <button onClick={openReviewModal} style={{ padding: '0.4rem 0.8rem', borderRadius: 8, border: 'none', backgroundColor: 'var(--accent-primary)', color: 'white', cursor: 'pointer' }}>Leave Review</button>
                         </div>
+                    </div>
+                </div>
+
+                {/* Stats Section - Teaching and Learning Hours for this Match */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                    <div style={{ backgroundColor: 'var(--background-secondary)', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Teaching Hours</p>
+                        <h3 style={{ margin: 0, fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>{matchStats.totalTeachingHours.toFixed(1)}</h3>
+                        <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>hours spent teaching</p>
+                    </div>
+                    <div style={{ backgroundColor: 'var(--background-secondary)', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Learning Hours</p>
+                        <h3 style={{ margin: 0, fontSize: '2.5rem', fontWeight: 'bold', color: '#28a745' }}>{matchStats.totalLearningHours.toFixed(1)}</h3>
+                        <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>hours spent learning</p>
                     </div>
                 </div>
 
