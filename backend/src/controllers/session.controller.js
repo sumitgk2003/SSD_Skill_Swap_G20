@@ -147,6 +147,24 @@ export const getMySessions = asyncHandler(async (req, res) => {
 
   return res.status(200).json(new ApiResponse(200, sessions, 'Sessions fetched'));
 });
+// Get session history for current user with a specific partner (filtered by matchId)
+export const getPartnerSessionHistory = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const { matchId } = req.query;
+
+  if (!matchId || !mongoose.Types.ObjectId.isValid(matchId)) {
+    throw new ApiError(400, 'Valid matchId is required');
+  }
+
+  // Find all completed sessions for this match where current user is involved
+  const sessions = await Session.find({
+    match: matchId,
+    $or: [{ tutor: userId }, { learner: userId }],
+    completed: true
+  }).populate('tutor', 'name email').populate('learner', 'name email').sort({ date: -1 }).lean();
+
+  return res.status(200).json(new ApiResponse(200, sessions, 'Partner session history'));
+});
 
 // Summary for current user: hours taught/learned, avg rating received, current streak
 export const getMySummary = asyncHandler(async (req, res) => {
