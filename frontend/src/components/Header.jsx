@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
-import { setUser, setBio, setSkills, setInterests } from '../store/authSlice';
+import { resetAuth } from '../store/authSlice';
 import axios from 'axios';
 import ThemeToggleButton from './ThemeToggleButton';
 
@@ -90,10 +90,8 @@ const Header = () => {
       );
       if (res.data.success) {
         console.log("Logout successful:", res);
-        dispatch(setUser(null));
-        dispatch(setBio(""));
-        dispatch(setSkills([]));
-        dispatch(setInterests([]));
+        // clear entire auth slice to initial state
+        dispatch(resetAuth());
         navigate("/login");
       }
     } catch (error) {

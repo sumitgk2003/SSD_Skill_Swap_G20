@@ -102,6 +102,11 @@ const ProfilePage = () => {
   const userSkills = useSelector((state) => state.auth.skills);
   const userInterests = useSelector((state) => state.auth.interests);
   const user = useSelector((state) => state.auth.user);
+  const userAvailability = useSelector((state) => state.auth.availability);
+  const userTimezone = useSelector((state) => state.auth.timezone);
+  const userPreferredFormats = useSelector((state) => state.auth.preferredFormats);
+
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   
   return (
     <div style={styles.page}>
@@ -139,6 +144,40 @@ const ProfilePage = () => {
                   <p style={styles.noSkillsText}>No interests added yet. Go to "Edit Profile" to add some!</p>
               )}
           </div>
+        </div>
+
+        <div style={{ marginTop: '2rem' }}>
+          <h2 style={styles.skillsTitle}>Timezone & Preferences</h2>
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{ marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Timezone</div>
+            <div style={{ ...styles.skillTag, display: 'inline-block' }}>{userTimezone || 'Not set'}</div>
+          </div>
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{ marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Preferred Formats</div>
+            {Array.isArray(userPreferredFormats) && userPreferredFormats.length > 0 ? (
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {userPreferredFormats.map((f, idx) => (
+                  <div key={idx} style={{ ...styles.skillTag }}>{f}</div>
+                ))}
+              </div>
+            ) : (
+              <div style={styles.noSkillsText}>No preferred formats set.</div>
+            )}
+          </div>
+
+          <h2 style={styles.skillsTitle}>Availability</h2>
+          {Array.isArray(userAvailability) && userAvailability.length > 0 ? (
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {userAvailability.map((s, i) => (
+                <div key={i} style={{ ...styles.skillTag, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{ fontWeight: 700 }}>{dayNames[s.dayOfWeek]}</div>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{s.start} — {s.end}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p style={styles.noSkillsText}>No availability slots set. Edit your profile to add slots.</p>
+          )}
         </div>
       </div>
     </div>

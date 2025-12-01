@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
-import { setSkills, setUser,setInterests,setBio } from '../store/authSlice'; // Import setUser action
+import { setSkills, setUser,setInterests,setBio, setAvailability, setTimezone, setPreferredFormats } from '../store/authSlice'; // Import setUser action
 import GoogleLoginButton from '../components/GoogleLoginButton';
 import axios from 'axios';
 
@@ -31,11 +31,17 @@ const LoginPage = () => {
           email: res.data.data.user.email,
           id: res.data.data.user._id,
         };
-        console.log("Login successful:", res);
+        //console.log("Login successful:", res);
         dispatch(setUser(user));
         dispatch(setBio(res.data.data.user.bio || ""));
         dispatch(setSkills(res.data.data.user.skills || []));
         dispatch(setInterests(res.data.data.user.interests || []));
+        // store availability, timezone and preferredFormats returned from backend into redux
+        dispatch(setAvailability(res.data.data.user.availability || []));
+        dispatch(setTimezone(res.data.data.user.timezone || ''));
+        dispatch(setPreferredFormats(res.data.data.user.preferredFormats || []));
+        console.log("Timezone:", res.data.data.user.timezone);
+        console.log("Preferred Formats:", res.data.data.user.preferredFormats);
         navigate("/dashboard");
       }
     } catch (error) {

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { setSkills, setInterests, setBio } from '../store/authSlice';
+import { setSkills, setInterests, setBio, setAvailability, setTimezone, setPreferredFormats } from '../store/authSlice';
 import axios from 'axios';
+import { set } from 'mongoose';
 
 const styles = {
   page: {
@@ -165,7 +166,9 @@ const CreateProfilePage = () => {
   const userSkills = useSelector((state) => state.auth.skills);
   const userInterests = useSelector((state) => state.auth.interests);
   const userBio = useSelector((state) => state.auth.bio);
-  
+  const userAvailability = useSelector((state) => state.auth.availability);
+  const userTimezone = useSelector((state) => state.auth.timezone);
+  const preferredFormats = useSelector((state) => state.auth.preferredFormats);
   const [bio, setLocalBio] = useState('');
   
   // Input states
@@ -183,7 +186,7 @@ const CreateProfilePage = () => {
   
   const [showSaveMessage, setShowSaveMessage] = useState(false);
   // Availability and preferences
-  const [timezone, setTimezone] = useState('');
+  const [localTimezone, setLocalTimezone] = useState('');
   const [preferredFormatsState, setPreferredFormatsState] = useState({ online: true, 'in person': true, chat: true });
   const [availabilitySlots, setAvailabilitySlots] = useState([]);
   const [slotDay, setSlotDay] = useState(1);
@@ -233,11 +236,19 @@ const CreateProfilePage = () => {
     setLocalBio(userBio || '');
     setCurrentTeachingSkills(userSkills || []);
     setCurrentLearningSkills(userInterests || []);
+    // initialize availability from redux when available
+    if (Array.isArray(userAvailability) && userAvailability.length > 0) {
+      setAvailabilitySlots(userAvailability);
+    }
     // load timezone and preferred formats from user slice if available
-    const user = (window.__INITIAL_USER__ && window.__INITIAL_USER__) || null;
-    if (user && user.timezone) setTimezone(user.timezone);
+    setLocalTimezone(userTimezone || '');
+    setPreferredFormatsState({
+      online: preferredFormats.includes('online'),
+      'in person': preferredFormats.includes('in person'),
+      chat: preferredFormats.includes('chat'),
+    });
     // Note: better approach is to pull timezone/preferredFormats from redux auth slice when available
-  }, [userSkills, userInterests, userBio]);
+  }, [userSkills, userInterests, userBio, userAvailability]);
 
   // List of common IANA timezones for dropdown
   const timezoneOptions = [
@@ -317,7 +328,7 @@ const CreateProfilePage = () => {
           interests: currentLearningSkills,
           skills: currentTeachingSkills,
           bio: bio,
-          timezone: timezone || undefined,
+          timezone: localTimezone || undefined,
           preferredFormats: Object.keys(preferredFormatsState).filter(k => preferredFormatsState[k]),
           availability: availabilitySlots,
         },
@@ -327,6 +338,11 @@ const CreateProfilePage = () => {
         dispatch(setSkills(currentTeachingSkills));
         dispatch(setInterests(currentLearningSkills));
         dispatch(setBio(bio));
+        // persist availability to redux so other pages (Profile/Edit) can show them
+        dispatch(setAvailability(availabilitySlots));
+        // also persist timezone and preferredFormats into redux
+        dispatch(setTimezone(localTimezone || ''));
+        dispatch(setPreferredFormats(Object.keys(preferredFormatsState).filter(k => preferredFormatsState[k])));
       }
     } catch (error) {
       console.error("Error during profile update:", error);
@@ -369,8 +385,8 @@ const CreateProfilePage = () => {
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Timezone</label>
-            <select value={timezone} onChange={(e) => setTimezone(e.target.value)} style={styles.input}>
-              <option value="">{Intl.DateTimeFormat().resolvedOptions().timeZone || 'Select your timezone'}</option>
+            <select value={localTimezone} onChange={(e) => setLocalTimezone(e.target.value)} style={styles.input}>
+              <option value="">{'Select your timezone'}</option>
               {timezoneOptions.map(tz => (
                 <option key={tz} value={tz}>{tz}</option>
               ))}
