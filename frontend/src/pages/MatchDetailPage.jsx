@@ -1465,8 +1465,37 @@ const MatchDetailPage = () => {
                             <div style={{ color: 'var(--text-secondary)' }}>
                                 ⭐ {avgRating && avgRating.avg !== null ? `${avgRating.avg} (${avgRating.count})` : 'No ratings yet'}
                             </div>
-                            <button onClick={openReviewModal} style={{ padding: '0.4rem 0.8rem', borderRadius: 8, border: 'none', backgroundColor: 'var(--accent-primary)', color: 'white', cursor: 'pointer' }}>Leave Review</button>
+
+                            <button
+                                onClick={openReviewModal}
+                                style={{
+                                    padding: '0.4rem 0.8rem',
+                                    borderRadius: 8,
+                                    border: 'none',
+                                    backgroundColor: 'var(--accent-primary)',
+                                    color: 'white',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Leave Review
+                            </button>
+
+                            {/* NEW BUTTON */}
+                            <button
+                                onClick={() => navigate(`/user/${matchData.partner._id}`)}
+                                style={{
+                                    padding: '0.4rem 0.8rem',
+                                    borderRadius: 8,
+                                    border: '1px solid var(--border-color)',
+                                    backgroundColor: 'var(--background-secondary)',
+                                    color: 'var(--text-primary)',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Visit Profile
+                            </button>
                         </div>
+
                     </div>
                 </div>
 
