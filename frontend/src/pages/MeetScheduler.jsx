@@ -8,6 +8,19 @@ export default function MeetsListPage() {
   const [search, setSearch] = useState("");
   const [yourMeets, setYourMeets] = useState([]);
   const [loadingYour, setLoadingYour] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [selectedDate, setSelectedDate] = useState(null); // YYYY-MM-DD
+  // Helper to produce local YYYY-MM-DD (avoids UTC shift caused by toISOString)
+  const formatYMD = (input) => {
+    const d = new Date(input);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
   // fetch user's meets on load and when user changes
   useEffect(() => {
     const fetchYourMeets = async () => {
@@ -21,7 +34,7 @@ export default function MeetsListPage() {
             title: m.title,
             host: String(m.organizer) === String(user._id) ? user.name : (m.organizerName || 'Host'),
             type: m.meetType === 'online' ? 'online' : 'inperson',
-            date: new Date(m.dateAndTime).toISOString().slice(0,10),
+            date: formatYMD(m.dateAndTime),
             time: new Date(m.dateAndTime).toTimeString().slice(0,5),
             tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
             joinUrl: m.zoomJoinUrl || m.googleEventHtmlLink || null,
@@ -41,6 +54,8 @@ export default function MeetsListPage() {
 
   const visible = useMemo(() => {
     return yourMeets.filter((m) => {
+      // If a date is selected in the calendar, only show that day's meetings
+      if (selectedDate && m.date !== selectedDate) return false;
       if (filter === 'online' && m.type !== 'online') return false;
       if (filter === 'inperson' && m.type !== 'inperson') return false;
       if (search.trim()) {
@@ -49,7 +64,27 @@ export default function MeetsListPage() {
       }
       return true;
     });
-  }, [yourMeets, filter, search]);
+  }, [yourMeets, filter, search, selectedDate]);
+
+  // Build calendar days for currentMonth (6 weeks view)
+  const calendarDays = useMemo(() => {
+    const first = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const startDay = first.getDay(); // 0 (Sun) - 6
+    const start = new Date(first);
+    start.setDate(first.getDate() - startDay);
+
+    const days = [];
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+  const key = formatYMD(d);
+      const meetings = yourMeets.filter(m => m.date === key).sort((a,b) => a.time > b.time ? 1 : -1);
+      days.push({ date: d, key, meetings, inMonth: d.getMonth() === currentMonth.getMonth() });
+    }
+    return days;
+  }, [currentMonth, yourMeets]);
+
+  const todayKey = formatYMD(new Date());
 
   const handleJoin = (m) => {
     if (!m || !m.joinUrl) return;
@@ -100,6 +135,83 @@ export default function MeetsListPage() {
           <button style={filterBtn(filter === 'inperson')} onClick={() => setFilter('inperson')}>In person</button>
 
           <input placeholder='Search title, host, notes...' value={search} onChange={(e) => setSearch(e.target.value)} style={searchStyle} aria-label='Search meets' />
+        </div>
+      </div>
+
+      {/* Calendar month view */}
+      <div style={{ width: '100%', maxWidth: 1200, margin: '0 auto 1.25rem auto', background: 'var(--background-secondary)', padding: 16, borderRadius: 12, border: '1px solid var(--border-color)', boxShadow: 'var(--card-shadow)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 18, color: 'var(--text-primary)' }} aria-label="Previous month">◀</button>
+            <strong style={{ fontSize: 16, color: 'var(--text-primary)' }}>{currentMonth.toLocaleString(undefined, { month: 'long', year: 'numeric' })}</strong>
+            <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 18, color: 'var(--text-primary)' }} aria-label="Next month">▶</button>
+          </div>
+          <div>
+            {selectedDate ? (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div style={{ color: 'var(--text-secondary)' }}>Showing: <strong style={{ color: 'var(--text-primary)' }}>{selectedDate}</strong></div>
+                <button onClick={() => setSelectedDate(null)} aria-label="Clear selected date" style={{ border: 'none', background: 'var(--accent-primary)', color: '#fff', padding: '6px 8px', borderRadius: 8, cursor: 'pointer', boxShadow: 'var(--card-shadow)' }}>Clear date</button>
+              </div>
+            ) : (
+              <div style={{ color: 'var(--text-secondary)' }}>Click a day to filter meetings</div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8, marginBottom: 8 }}>
+          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
+            <div key={d} style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-secondary)', fontWeight: 700 }}>{d}</div>
+          ))}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
+          {calendarDays.map((day) => {
+            const isSelected = selectedDate === day.key;
+            const isToday = todayKey === day.key;
+            return (
+              <button
+                key={day.key}
+                onClick={() => {
+                  if (!day.inMonth) setCurrentMonth(new Date(day.date.getFullYear(), day.date.getMonth(), 1));
+                  setSelectedDate(day.key === selectedDate ? null : day.key);
+                }}
+                style={{
+                  minHeight: 96,
+                  textAlign: 'left',
+                  padding: 10,
+                  borderRadius: 10,
+                  border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                  background: isSelected ? 'linear-gradient(180deg, rgba(106,90,205,0.06), rgba(106,90,205,0.02))' : (day.inMonth ? 'var(--background-primary)' : 'transparent'),
+                  cursor: 'pointer',
+                  overflow: 'hidden',
+                  boxShadow: isSelected ? '0 8px 24px rgba(106,90,205,0.12)' : 'none',
+                  transition: 'transform 0.12s ease, box-shadow 0.12s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'none'}
+                aria-pressed={isSelected}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ fontSize: 13, color: day.inMonth ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: 800 }}>
+                    {day.date.getDate()}
+                    {isToday && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--accent-primary)' }}>• today</span>}
+                  </div>
+                  {day.meetings.length > 0 && (
+                    <div style={{ background: 'var(--accent-primary)', color: '#fff', fontSize: 11, padding: '3px 8px', borderRadius: 999 }}>{day.meetings.length}</div>
+                  )}
+                </div>
+
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', maxHeight: 52, overflow: 'hidden' }}>
+                  {day.meetings.slice(0,3).map(mt => (
+                    <div key={mt.id} style={{ marginBottom: 6 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>{mt.time} — {mt.title}</div>
+                    </div>
+                  ))}
+                  {day.meetings.length > 3 && <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>+{day.meetings.length - 3} more</div>}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 

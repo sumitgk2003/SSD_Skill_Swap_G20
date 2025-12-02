@@ -2,6 +2,8 @@ import {Router} from "express";
 import {registerUser,loginUser,logoutUser,updateProfile,
 findMatches,sendRequest,getPendingRequests,getConnectedUsers,
 respondRequest,getAllSkills,getCurrentUser,getAllConnections,
+getUserProfileById,getCategory,addSkill,getAllSk,
+getAllCategory,getCategoryMatches
 getUserProfileById,getCategory,addSkill,getAllSk, updateMatchProgress
 } from "../controllers/user.controller.js";
 
@@ -30,6 +32,9 @@ router.route("/profile/:userId").get(verifyJWT, getUserProfileById);
 
 router.route("/getCategory").post(verifyJWT, getCategory);
 router.route("/addSkill").post(verifyJWT, addSkill);
+
+router.route("/getAllCategory").get(verifyJWT, getAllCategory);
+router.route("/getCategoryMatches").post(verifyJWT, getCategoryMatches);
 router.route("/matches/:matchId/progress").patch(verifyJWT, updateMatchProgress);
 
 export default router;
