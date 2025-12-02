@@ -120,6 +120,7 @@ const Header = () => {
         {/* You can add other public links like 'About Us' here */}
       </nav>
       <div style={styles.headerButtons}>
+        <NavLink to="/policy" style={({isActive}) => ({...getNavLinkStyle({isActive}), marginRight: '12px'})}>Policy</NavLink>
         <ThemeToggleButton />
         {user ? (
           <button 
