@@ -86,8 +86,9 @@ const Notifications = () => {
 
   useEffect(() => {
     fetchNotifications();
-    // poll every 30s
-    pollingRef.current = setInterval(fetchNotifications, 30000);
+    // poll every 3s (3000ms) to update notifications frequently
+    // NOTE: keep interval reasonable to avoid too many server requests in production
+    pollingRef.current = setInterval(fetchNotifications, 3000);
     return () => clearInterval(pollingRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
