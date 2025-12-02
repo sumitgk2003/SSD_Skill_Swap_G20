@@ -26,6 +26,26 @@ const matchSchema = new mongoose.Schema({
     enum: ["pending", "accepted", "rejected"],
     default: "pending"
   }
+  ,
+  // Hours requested by user1 (sender) to learn from user2
+  requestedHoursUser1: {
+    type: Number,
+    default: null,
+  },
+  // Hours requested by user2 (responder) to learn from user1 (set when accepting)
+  requestedHoursUser2: {
+    type: Number,
+    default: null,
+  },
+  // Progress tracking: how many hours each user has learned so far
+  taughtHoursUser1: {
+    type: Number,
+    default: 0,
+  },
+  taughtHoursUser2: {
+    type: Number,
+    default: 0,
+  }
 }, {
   timestamps: true
 });

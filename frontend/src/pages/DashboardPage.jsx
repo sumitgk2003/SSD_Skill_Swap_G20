@@ -67,7 +67,7 @@ const RequestCard = ({ request, onAccept, onDecline }) => {
             <div style={infoStyle}>
                 <h4 style={nameStyle}>{request.sender.name}</h4>
                 <p style={skillStyle}>
-                    Wants to learn <strong>{request.teaching_requirement}</strong> from you, and will teach you <strong>{request.learning_opportunity}</strong>.
+                  Wants to learn <strong>{request.teaching_requirement}</strong> from you{request.requested_hours ? ` (${request.requested_hours} hrs)` : ''}, and will teach you <strong>{request.learning_opportunity}</strong>.
                 </p>
             </div>
             <div style={buttonGroupStyle}>
@@ -166,6 +166,17 @@ const MatchCard = ({ match, type, onMatchClick }) => {
                 <p style={statusStyle}>
                     Status: {match.status ? match.status.charAt(0).toUpperCase() + match.status.slice(1) : 'Active'}
                 </p>
+              {/* Progress display: show how many hours learned vs requested */}
+              {typeof match.requested_hours_i_want !== 'undefined' && match.requested_hours_i_want !== null && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                    Progress: {match.taught_hours_i_have || 0} / {match.requested_hours_i_want} hrs
+                  </p>
+                  <div style={{ width: '100%', height: 8, backgroundColor: 'var(--border-color)', borderRadius: 4, marginTop: 6 }}>
+                    <div style={{ width: `${Math.min(100, Math.round(((match.taught_hours_i_have || 0) / match.requested_hours_i_want) * 100))}%`, height: '100%', backgroundColor: 'var(--accent-primary)', borderRadius: 4 }} />
+                  </div>
+                </div>
+              )}
             </div>
         </div>
     );
@@ -362,9 +373,17 @@ const DashboardPage = () => {
 
   const respondToRequest = async (requestId, status) => {
     try {
+      const payload = { requestId, status };
+      // If accepting, allow the recipient to state how many hours they want to learn in return
+      if (status === 'accepted') {
+        const hoursInput = window.prompt('If you want to learn some hours from the requester, enter hours (optional):', '0');
+        const hours = hoursInput ? Number(hoursInput) : 0;
+        if (Number.isFinite(hours) && hours > 0) payload.requestedHoursForResponder = hours;
+      }
+
       await axios.post(
         'http://localhost:8000/api/v1/users/respondRequest',
-        { requestId, status },
+        payload,
         { withCredentials: true }
       );
       setIncomingRequests(prevRequests => prevRequests.filter(req => req._id !== requestId));

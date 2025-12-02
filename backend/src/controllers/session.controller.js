@@ -94,6 +94,26 @@ export const createSession = asyncHandler(async (req, res) => {
       if (review) existing.review = review;
       await existing.save();
 
+      // Update taught hours in Match model
+      if (matchId && durationInMinutes > 0) {
+        try {
+          const match = await Match.findById(matchId);
+          if (match) {
+            // Increment taught hours for the tutor
+            const durationHours = durationInMinutes / 60;
+            if (String(match.user1) === String(tutorId)) {
+              match.taughtHoursUser1 = (match.taughtHoursUser1 || 0) + durationHours;
+            } else if (String(match.user2) === String(tutorId)) {
+              match.taughtHoursUser2 = (match.taughtHoursUser2 || 0) + durationHours;
+            }
+            await match.save();
+            console.log('Updated Match taught hours:', match._id, { taughtHoursUser1: match.taughtHoursUser1, taughtHoursUser2: match.taughtHoursUser2 });
+          }
+        } catch (err) {
+          console.error('Failed to update Match taught hours:', err);
+        }
+      }
+
       // If a rating was provided, create a Review tied to this session.
       if (rating && rating > 0) {
         try {
@@ -121,6 +141,26 @@ export const createSession = asyncHandler(async (req, res) => {
     rating: rating || undefined,
     review: review || undefined,
   });
+
+  // Update taught hours in Match model
+  if (matchId && durationInMinutes > 0) {
+    try {
+      const match = await Match.findById(matchId);
+      if (match) {
+        // Increment taught hours for the tutor
+        const durationHours = durationInMinutes / 60;
+        if (String(match.user1) === String(tutorId)) {
+          match.taughtHoursUser1 = (match.taughtHoursUser1 || 0) + durationHours;
+        } else if (String(match.user2) === String(tutorId)) {
+          match.taughtHoursUser2 = (match.taughtHoursUser2 || 0) + durationHours;
+        }
+        await match.save();
+        console.log('Updated Match taught hours:', match._id, { taughtHoursUser1: match.taughtHoursUser1, taughtHoursUser2: match.taughtHoursUser2 });
+      }
+    } catch (err) {
+      console.error('Failed to update Match taught hours:', err);
+    }
+  }
 
   // If a rating was provided, create a Review tied to this session.
   if (rating && rating > 0) {

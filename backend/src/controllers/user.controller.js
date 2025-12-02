@@ -355,7 +355,7 @@ const findMatches = asyncHandler(async (req, res) => {
 });
 
 const sendRequest = asyncHandler(async (req, res) => {
-  const { recipientId, teachSkill, learnSkill } = req.body; 
+  const { recipientId, teachSkill, learnSkill, requestedHours } = req.body; 
   const senderId = req.user._id;
 
   if (!recipientId) {
@@ -397,6 +397,10 @@ const sendRequest = asyncHandler(async (req, res) => {
     skill1: teachSkill, // Mapped: The sender teaches this
     skill2: learnSkill, // Mapped: The recipient teaches this (sender learns it)
     status: "pending",
+    requestedHoursUser1: typeof requestedHours === 'number' ? requestedHours : (requestedHours ? Number(requestedHours) : null),
+    // taught hours start at 0
+    taughtHoursUser1: 0,
+    taughtHoursUser2: 0,
   });
 
   // create notification for recipient
@@ -436,6 +440,7 @@ const getPendingRequests = asyncHandler(async (req, res) => {
     sender: req.user1,        // The User Object of the sender
     learning_opportunity: req.skill1, // What they will teach you
     teaching_requirement: req.skill2, // What they want from you
+    requested_hours: req.requestedHoursUser1 || null,
     status: req.status,
     created_at: req.createdAt
   }));
@@ -493,7 +498,7 @@ const getConnectedUsers = asyncHandler(async (req, res) => {
 });
 
 const respondRequest = asyncHandler(async (req, res) => {
-  const { requestId, status } = req.body;
+  const { requestId, status, requestedHoursForResponder } = req.body;
   const currentUser = req.user._id;
 
   // 1. Validation: Input check
@@ -524,7 +529,18 @@ const respondRequest = asyncHandler(async (req, res) => {
   }
 
   // 5. Update the status
-  matchRequest.status = status;
+  // If accepting, allow the responder to declare how many hours they want to learn
+  if (status === 'accepted') {
+    if (typeof requestedHoursForResponder !== 'undefined') {
+      matchRequest.requestedHoursUser2 = typeof requestedHoursForResponder === 'number' ? requestedHoursForResponder : Number(requestedHoursForResponder);
+    }
+    // Ensure taught hours fields exist
+    matchRequest.taughtHoursUser1 = matchRequest.taughtHoursUser1 || 0;
+    matchRequest.taughtHoursUser2 = matchRequest.taughtHoursUser2 || 0;
+    matchRequest.status = 'accepted';
+  } else {
+    matchRequest.status = status;
+  }
   await matchRequest.save();
 
   // notify the requester if accepted
@@ -616,6 +632,10 @@ const getAllConnections = asyncHandler(async (req, res) => {
 
     return {
       _id: match._id,
+      user1: match.user1._id,  // Include raw user1 ID for tutor/learner identification
+      user2: match.user2._id,  // Include raw user2 ID for tutor/learner identification
+      taughtHoursUser1: match.taughtHoursUser1,  // Include taught hours for stats
+      taughtHoursUser2: match.taughtHoursUser2,  // Include taught hours for stats
       partner: {
         _id: partner._id,
         name: partner.name,
@@ -624,6 +644,14 @@ const getAllConnections = asyncHandler(async (req, res) => {
       status: match.status,
       skill_i_teach: currentUserSkill, // Skill the current user is teaching in this match
       skill_i_learn: partnerSkill,     // Skill the current user is learning in this match
+      // requested hours: what the current user requested (to learn from partner)
+      requested_hours_i_want: isCurrentUser1 ? match.requestedHoursUser1 : match.requestedHoursUser2,
+      // what the partner requested (to learn from current user)
+      requested_hours_partner_want: isCurrentUser1 ? match.requestedHoursUser2 : match.requestedHoursUser1,
+      // taught hours progress: how many hours the current user has learned so far
+      taught_hours_i_have: isCurrentUser1 ? match.taughtHoursUser1 : match.taughtHoursUser2,
+      // how many hours the partner has learned so far
+      taught_hours_partner_have: isCurrentUser1 ? match.taughtHoursUser2 : match.taughtHoursUser1,
       created_at: match.createdAt,
       updated_at: match.updatedAt,
     };
@@ -736,3 +764,43 @@ export {
   getAllSk // Export the new function
 };
 export { getCurrentUser };
+
+// Endpoint to update match progress (increment taught hours)
+const updateMatchProgress = asyncHandler(async (req, res) => {
+  const { matchId } = req.params;
+  const { recipientId, hours } = req.body; // recipientId = who learned these hours (the recipient of teaching)
+  const updaterId = req.user._id;
+
+  if (!mongoose.Types.ObjectId.isValid(matchId)) {
+    throw new ApiError(400, 'Invalid match id');
+  }
+  const match = await Match.findById(matchId);
+  if (!match) throw new ApiError(404, 'Match not found');
+
+  // Ensure updater is a participant
+  if (![match.user1.toString(), match.user2.toString()].includes(updaterId.toString())) {
+    throw new ApiError(403, 'Not authorized to update this match');
+  }
+
+  if (!recipientId || ![match.user1.toString(), match.user2.toString()].includes(recipientId.toString())) {
+    throw new ApiError(400, 'recipientId must be one of participants');
+  }
+
+  const h = Number(hours || 0);
+  if (Number.isNaN(h) || h <= 0) {
+    throw new ApiError(400, 'hours must be a positive number');
+  }
+
+  // If recipient is user1, we increment taughtHoursUser1 (they learned h hours)
+  if (recipientId.toString() === match.user1.toString()) {
+    match.taughtHoursUser1 = (match.taughtHoursUser1 || 0) + h;
+  } else {
+    match.taughtHoursUser2 = (match.taughtHoursUser2 || 0) + h;
+  }
+
+  await match.save();
+
+  return res.status(200).json(new ApiResponse(200, match, 'Match progress updated'));
+});
+
+export { updateMatchProgress };

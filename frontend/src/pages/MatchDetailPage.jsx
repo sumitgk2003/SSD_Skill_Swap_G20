@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
@@ -421,7 +421,7 @@ const ChatSection = ({ matchId, matchUser, skillTitle, onOpenReport }) => {
 };
 
 // Meetings Section Component (with scheduling)
-const MeetingsSection = ({ matchId, matchUser }) => {
+const MeetingsSection = ({ matchId, matchUser, skillTitle, onSessionComplete }) => {
     const { user } = useSelector((state) => state.auth);
     const [meetings, setMeetings] = useState([]);
     const [sessions, setSessions] = useState([]);
@@ -502,23 +502,27 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                 });
                     console.log('filteredMeetings for matchId', matchId, filteredMeetings);
 
-                const mapped = filteredMeetings.map((m) => ({
-                    id: m._id,
-                    title: m.title || (m.meetType ? (m.meetType === 'online' ? 'Online Meeting' : 'In-Person Meeting') : 'Meeting'),
-                    host: String((m.organizer && (m.organizer._id || m.organizer)) || '') === String(user?._id || user?.id) ? 'You' : (m.organizerName || (m.organizer && m.organizer.name) || 'Host'),
-                    // normalize organizer to an id string when possible
-                    organizer: (m.organizer && (m.organizer._id || m.organizer)) || m.organizer,
-                    attendees: m.attendees || [],
-                    type: m.meetType === 'online' ? 'online' : 'inperson',
-                    date: m.dateAndTime ? new Date(m.dateAndTime).toISOString().slice(0, 10) : null,
-                    time: m.dateAndTime ? new Date(m.dateAndTime).toTimeString().slice(0, 5) : null,
-                    duration: m.durationInMinutes || 30,
-                    // provide explicit fields used in rendering
-                    zoomUrl: m.zoomJoinUrl || null,
-                    googleCalendarUrl: m.googleEventHtmlLink || null,
-                    skillBeingTaught: m.skillBeingTaught || null,
-                    organizerRole: m.organizerRole || null,
-                }));
+                const mapped = filteredMeetings.map((m) => {
+                    // Extract organizer ID whether it's populated as object or just ID
+                    const organizerId = m.organizer && typeof m.organizer === 'object' ? m.organizer._id : m.organizer;
+                    return {
+                        id: m._id,
+                        title: m.title || (m.meetType ? (m.meetType === 'online' ? 'Online Meeting' : 'In-Person Meeting') : 'Meeting'),
+                        host: String(organizerId || '') === String(user?._id || user?.id) ? 'You' : (m.organizerName || (m.organizer && m.organizer.name) || 'Host'),
+                        // normalize organizer to an id string
+                        organizer: organizerId,
+                        attendees: m.attendees || [],
+                        type: m.meetType === 'online' ? 'online' : 'inperson',
+                        date: m.dateAndTime ? new Date(m.dateAndTime).toISOString().slice(0, 10) : null,
+                        time: m.dateAndTime ? new Date(m.dateAndTime).toTimeString().slice(0, 5) : null,
+                        duration: m.durationInMinutes || 30,
+                        // provide explicit fields used in rendering
+                        zoomUrl: m.zoomJoinUrl || null,
+                        googleCalendarUrl: m.googleEventHtmlLink || null,
+                        skillBeingTaught: m.skillBeingTaught || null,
+                        organizerRole: m.organizerRole || null,
+                    };
+                });
                 
                 // log mapped meetings and participant checks for debugging
                 mapped.forEach((m) => {
@@ -575,12 +579,32 @@ const MeetingsSection = ({ matchId, matchUser }) => {
     };
 
     const handleMarkComplete = async (meeting) => {
-        // Open the modal and set current meeting/session context. Modal enforces learner-only check before submit.
+        // Allow marking complete even without a pre-existing session.
+        // If a session exists, validate learner. Otherwise, derive from organizerRole.
         const session = sessions && sessions.find(s => s.meet && String(s.meet) === String(meeting.id));
-        if (!session) return alert('No scheduled session exists for this meeting.');
-        const currentUserId = user?._id || user?.id;
-        const sessionLearnerId = session.learner?._id || session.learner;
-        if (String(sessionLearnerId) !== String(currentUserId)) {
+        const currentUserId = String(user?._id || user?.id);
+
+        // Determine if current user is the learner
+        let isLearner = false;
+        if (session) {
+            // If session exists, check that current user is the learner
+            const sessionLearnerId = String(session.learner?._id || session.learner || '');
+            const sessionLearnerEmail = String(session.learner?.email || '');
+            isLearner = (sessionLearnerId && sessionLearnerId === currentUserId) || (sessionLearnerEmail && sessionLearnerEmail === user?.email);
+        } else {
+            // No session yet: derive from organizerRole
+            const isOrganizer = String(meeting.organizer) === currentUserId;
+            const isAttendee = Array.isArray(meeting.attendees) && meeting.attendees.includes(user?.email);
+            if (isOrganizer) {
+                // organizer is learner when organizerRole === 'learn'
+                isLearner = meeting.organizerRole === 'learn';
+            } else if (isAttendee) {
+                // attendee is learner when organizerRole === 'teach'
+                isLearner = meeting.organizerRole === 'teach';
+            }
+        }
+
+        if (!isLearner) {
             return alert('Only the learner may mark this session as complete');
         }
 
@@ -595,21 +619,69 @@ const MeetingsSection = ({ matchId, matchUser }) => {
         setSubmittingMark(true);
         try {
             const { meeting, session } = currentMeetingToComplete;
+            const currentUserId = String(user?._id || user?.id);
+            console.log('submitMarkComplete: currentUserId=', currentUserId, 'meeting.organizer=', meeting.organizer, 'matchUser._id=', matchUser?._id);
+
+            // If no session exists, we need to derive tutor/learner from meeting.organizerRole
+            let tutorId, learnerId;
+            if (session) {
+                tutorId = session.tutor?._id || session.tutor;
+                learnerId = session.learner?._id || session.learner;
+            } else {
+                // Derive from organizerRole and current user
+                const isOrganizer = String(meeting.organizer) === currentUserId;
+                const isAttendee = Array.isArray(meeting.attendees) && meeting.attendees.includes(user?.email);
+                console.log('submitMarkComplete: no session, isOrganizer=', isOrganizer, 'isAttendee=', isAttendee, 'organizerRole=', meeting.organizerRole);
+                
+                if (isOrganizer) {
+                    if (meeting.organizerRole === 'teach') {
+                        tutorId = currentUserId;
+                        learnerId = matchUser?._id; // Attendee is learner
+                    } else {
+                        learnerId = currentUserId;
+                        tutorId = matchUser?._id; // Attendee is tutor
+                    }
+                } else if (isAttendee) {
+                    if (meeting.organizerRole === 'teach') {
+                        learnerId = currentUserId;
+                        tutorId = meeting.organizer; // Organizer is tutor
+                    } else {
+                        tutorId = currentUserId;
+                        learnerId = meeting.organizer; // Organizer is learner
+                    }
+                }
+            }
+
             const payload = {
+                matchId: matchId,
                 meetId: meeting.id,
-                tutorId: session.tutor?._id || session.tutor,
-                learnerId: session.learner?._id || session.learner,
-                date: session.date || (meeting.date && meeting.time ? `${meeting.date}T${meeting.time}:00Z` : new Date().toISOString()),
-                durationInMinutes: session.durationInMinutes || meeting.duration || 30,
+                tutorId,
+                learnerId,
+                date: session?.date || (meeting.date && meeting.time ? `${meeting.date}T${meeting.time}:00Z` : new Date().toISOString()),
+                durationInMinutes: session?.durationInMinutes || meeting.duration || 30,
                 rating: markRating || undefined,
                 review: markReview || undefined,
             };
+            console.log('submitMarkComplete: payload=', payload);
 
             const res = await axios.post('http://localhost:8000/api/v1/sessions/complete', payload, { withCredentials: true });
+            console.log('submitMarkComplete: response=', res.data);
             if (res.data && (res.data.success || res.status === 200)) {
                 setCompleteModalOpen(false);
                 setCurrentMeetingToComplete(null);
                 try { window.dispatchEvent(new Event('sessionCreated')); } catch(e){}
+                // Notify parent to refresh match stats with a slight delay to ensure DB commit
+                console.log('submitMarkComplete: calling onSessionComplete callback');
+                if (typeof onSessionComplete === 'function') {
+                    console.log('submitMarkComplete: onSessionComplete is a function, calling it now');
+                    // Add small delay to ensure backend DB commit
+                    setTimeout(() => {
+                        console.log('submitMarkComplete: executing onSessionComplete after delay');
+                        onSessionComplete();
+                    }, 500);
+                } else {
+                    console.warn('submitMarkComplete: onSessionComplete is NOT a function', typeof onSessionComplete);
+                }
             } else {
                 alert('Failed to record session');
             }
@@ -659,7 +731,8 @@ const MeetingsSection = ({ matchId, matchUser }) => {
             time,
             duration,
             with: matchUser ? { id: matchUser._id, name: matchUser.name, email: matchUser.email } : null,
-            role: scheduledRole, // 'teach' or 'learn' - tells server who will be tutor/learner
+            organizerRole: scheduledRole, // 'teach' or 'learn' - tells server who will be tutor/learner
+            skillBeingTaught: skillTitle || null, // skill being taught in this meeting
         };
         return payload;
     };
@@ -933,22 +1006,43 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                             if (filterType === 'inperson') return meeting.type === 'inperson';
                             return true;
                         })
-                        .map((meeting) => {
-                            const isOrganizer = String(meeting.organizer) === String(user?._id || user?.id);
-                            const isAttendee = Array.isArray(meeting.attendees) && meeting.attendees.includes(user?.email);
-                            const isParticipant = isOrganizer || isAttendee;
-                            const completedSession = sessions && sessions.find(s => s.meet && String(s.meet) === String(meeting.id));
-                            const isCompleted = Boolean(completedSession && (completedSession.completed === true));
-                            
-                            // Determine if user is teaching or learning based on organizerRole
-                            let userIsTeaching = false;
-                            if (isOrganizer) {
-                              userIsTeaching = meeting.organizerRole === 'teach';
-                            } else {
-                              userIsTeaching = meeting.organizerRole === 'learn';
-                            }
+                                                        .map((meeting) => {
+                                                        const isOrganizer = String(meeting.organizer) === String(user?._id || user?.id);
+                                                        const isAttendee = Array.isArray(meeting.attendees) && meeting.attendees.includes(user?.email);
+                                                        const isParticipant = isOrganizer || isAttendee;
+                                                        const completedSession = sessions && sessions.find(s => s.meet && String(s.meet) === String(meeting.id));
+                                                        const isCompleted = Boolean(completedSession && (completedSession.completed === true));
 
-                            return (
+                                                        // Determine if user is teaching or learning based on organizerRole
+                                                        let userIsTeaching = false;
+                                                        if (isOrganizer) {
+                                                            userIsTeaching = meeting.organizerRole === 'teach';
+                                                        } else {
+                                                            userIsTeaching = meeting.organizerRole === 'learn';
+                                                        }
+
+                                                        // Compute visibility for 'Mark Complete' and log debug info
+                                                        const currentUserId = String(user?._id || user?.id || '');
+                                                        const currentUserEmail = String(user?.email || '');
+                                                        let showMarkComplete = false;
+                                                        if (completedSession) {
+                                                                const sessionLearnerId = String(completedSession.learner?._id || completedSession.learner || '');
+                                                                const sessionLearnerEmail = String(completedSession.learner?.email || '');
+                                                                const callerIsLearner = (sessionLearnerId && sessionLearnerId === currentUserId) || (sessionLearnerEmail && sessionLearnerEmail === currentUserEmail);
+                                                                showMarkComplete = !completedSession.completed && !!callerIsLearner;
+                                                        } else {
+                                                                if (meeting.organizerRole) {
+                                                                        if (isOrganizer) {
+                                                                                showMarkComplete = meeting.organizerRole === 'learn' && String(meeting.organizer) === currentUserId;
+                                                                        } else {
+                                                                                const attendeeByEmail = Array.isArray(meeting.attendees) && meeting.attendees.includes(currentUserEmail);
+                                                                                showMarkComplete = meeting.organizerRole === 'teach' && !!attendeeByEmail;
+                                                                        }
+                                                                }
+                                                        }
+                                                        console.debug('meet-mark-debug', { meetingId: meeting.id, isOrganizer, isAttendee, isParticipant, organizerRole: meeting.organizerRole, completedSessionId: completedSession?._id || null, sessionLearner: completedSession?.learner, currentUserId, currentUserEmail, showMarkComplete });
+
+                                                        return (
                             <div key={meeting.id} style={meetingCardStyle}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
                                     <div style={meetingInfoStyle}>
@@ -1114,7 +1208,32 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                                         </>
                                     )}
                                     {/* Mark Complete - visible to participants and only when not already completed */}
-                                    {completedSession && !completedSession.completed && String(completedSession.learner?._id || completedSession.learner) === String(user?._id || user?.id) && (
+                                    {
+                                        // Determine current user id
+                                    }
+                                    {(() => {
+                                        const currentUserId = String(user?._id || user?.id || '');
+                                        const currentUserEmail = String(user?.email || '');
+
+                                        // If a completedSession exists, only allow the session learner to mark complete
+                                        if (completedSession) {
+                                            const sessionLearnerId = String(completedSession.learner?._id || completedSession.learner || '');
+                                            const sessionLearnerEmail = String(completedSession.learner?.email || '');
+                                            const callerIsLearner = (sessionLearnerId && sessionLearnerId === currentUserId) || (sessionLearnerEmail && sessionLearnerEmail === currentUserEmail);
+                                            return !completedSession.completed && !!callerIsLearner;
+                                        }
+
+                                        // No session record yet: only show if meeting.organizerRole is defined and indicates this user is the learner
+                                        if (!meeting.organizerRole) return false;
+                                        if (isOrganizer) {
+                                            // organizer is learner when organizerRole === 'learn'
+                                            return meeting.organizerRole === 'learn' && String(meeting.organizer) === currentUserId;
+                                        } else {
+                                            // attendee is learner when organizerRole === 'teach'
+                                            const attendeeByEmail = Array.isArray(meeting.attendees) && meeting.attendees.includes(currentUserEmail);
+                                            return meeting.organizerRole === 'teach' && !!attendeeByEmail;
+                                        }
+                                    })() && (
                                         <button
                                             style={{
                                                 padding: '0.6rem 1.2rem',
@@ -1262,6 +1381,11 @@ const MatchDetailPage = () => {
     const [submittingReview, setSubmittingReview] = useState(false);
     const [matchStats, setMatchStats] = useState({ totalTeachingHours: 0, totalLearningHours: 0 });
 
+    // Debug: log whenever matchStats changes
+    useEffect(() => {
+        console.log('matchStats updated:', matchStats);
+    }, [matchStats]);
+
     // Add CSS animations
     useEffect(() => {
         const style = document.createElement('style');
@@ -1340,25 +1464,57 @@ const MatchDetailPage = () => {
         }
     }, [matchId, user]);
 
-    const fetchMatchStats = async () => {
+    const fetchMatchStats = useCallback(async () => {
         try {
-            const res = await axios.get(`http://localhost:8000/api/v1/sessions/me/partner-history?matchId=${matchId}`, { withCredentials: true });
-            if (res.data && res.data.success) {
-                const sessions = res.data.data || [];
-                const totalTeachingHours = sessions
-                    .filter(s => String(s.tutor?._id || s.tutor) === String(user?._id || user?.id))
-                    .reduce((sum, s) => sum + (s.durationInMinutes || 0), 0) / 60;
-                const totalLearningHours = sessions
-                    .filter(s => String(s.learner?._id || s.learner) === String(user?._id || user?.id))
-                    .reduce((sum, s) => sum + (s.durationInMinutes || 0), 0) / 60;
-                
-                setMatchStats({ totalTeachingHours, totalLearningHours });
+            console.log('fetchMatchStats called for matchId=', matchId, 'user._id=', user?._id);
+            // Fetch the match directly to get taught hours
+            const connectionsRes = await axios.get(
+                'http://localhost:8000/api/v1/users/getConnections',
+                { withCredentials: true }
+            );
+            console.log('fetchMatchStats: connections response received, data count=', connectionsRes.data.data?.length);
+            if (connectionsRes.data.success) {
+                const allMatches = connectionsRes.data.data || [];
+                const match = allMatches.find((m) => String(m._id) === String(matchId));
+                if (match) {
+                    console.log('fetchMatchStats: found match', { _id: match._id, taughtHoursUser1: match.taughtHoursUser1, taughtHoursUser2: match.taughtHoursUser2, user1: match.user1, user2: match.user2 });
+                    const currentUserId = String(user?._id || user?.id);
+                    const isUser1 = String(match.user1) === currentUserId;
+                    console.log('fetchMatchStats: currentUserId=', currentUserId, 'isUser1=', isUser1);
+                    
+                    // Determine teaching/learning hours based on user's role and match.user1/user2
+                    let totalTeachingHours = 0;
+                    let totalLearningHours = 0;
+                    
+                    if (isUser1) {
+                        // Current user is user1
+                        // User1 teaches skill1, learns skill2
+                        totalTeachingHours = match.taughtHoursUser1 || 0;
+                        totalLearningHours = match.taughtHoursUser2 || 0; // User2 taught user1
+                    } else {
+                        // Current user is user2
+                        // User2 teaches skill2, learns skill1
+                        totalTeachingHours = match.taughtHoursUser2 || 0;
+                        totalLearningHours = match.taughtHoursUser1 || 0; // User1 taught user2
+                    }
+                    
+                    console.log('fetchMatchStats: calculated hours', { totalTeachingHours, totalLearningHours });
+                    console.log('fetchMatchStats: about to call setMatchData and setMatchStats');
+                    // Update BOTH matchData and stats
+                    setMatchData(match);
+                    setMatchStats({ totalTeachingHours, totalLearningHours });
+                    console.log('fetchMatchStats: setMatchStats called with', { totalTeachingHours, totalLearningHours });
+                } else {
+                    console.warn('fetchMatchStats: match not found in connections for matchId=', matchId);
+                }
+            } else {
+                console.warn('fetchMatchStats: connections response not successful');
             }
         } catch (err) {
             console.error('Error fetching match stats:', err);
             setMatchStats({ totalTeachingHours: 0, totalLearningHours: 0 });
         }
-    };
+    }, [matchId, user]);
 
     const fetchReviewsForUser = async (userId) => {
         try {
@@ -1659,6 +1815,8 @@ const MatchDetailPage = () => {
                         <MeetingsSection
                             matchId={matchId}
                             matchUser={matchData.partner}
+                            skillTitle={skillTitle}
+                            onSessionComplete={fetchMatchStats}
                         />
                     )}
                     

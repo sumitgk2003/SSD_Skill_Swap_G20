@@ -9,7 +9,7 @@ import { createGoogleCalendarEvent, deleteGoogleCalendarEvent } from "../utils/g
 import { createZoomMeeting, deleteZoomMeeting } from "../utils/zoom.js";
 
 export const createMeet = asyncHandler(async (req, res) => {
-  const { match_id, type, date, time, duration, note, with: withUser } = req.body;
+  const { match_id, type, date, time, duration, note, with: withUser, organizerRole, skillBeingTaught } = req.body;
   if (!date || !time || !duration) throw new ApiError(400, "Missing required fields");
 
   const dateTime = new Date(`${date}T${time}:00`);
@@ -52,6 +52,8 @@ export const createMeet = asyncHandler(async (req, res) => {
     durationInMinutes: duration,
     organizer: req.user._id,
     attendees: withUser && withUser.email ? [withUser.email] : [],
+    organizerRole: organizerRole || null,
+    skillBeingTaught: skillBeingTaught || null,
   });
 
   await meet.save();
@@ -174,7 +176,7 @@ export const getMyMeets = asyncHandler(async (req, res) => {
 
   const meets = await Meet.find({
     $or: [ { organizer: req.user._id }, { attendees: user.email } ]
-  }).sort({ dateAndTime: 1 }).populate('organizer', 'name email').lean();
+  }).sort({ dateAndTime: 1 }).populate('organizer', 'name email').populate('match', 'skill1 skill2 user1 user2').lean();
 
   // attach organizerName for frontend convenience
   meets.forEach(m => {
@@ -200,7 +202,7 @@ export const getMeetsByMatchId = asyncHandler(async (req, res) => {
       { organizer: userId },
       { attendees: { $in: [req.user.email] } } // Assuming req.user.email is available after authentication
     ]
-  }).sort({ dateAndTime: 1 }).populate('organizer', 'name email').lean();
+  }).sort({ dateAndTime: 1 }).populate('organizer', 'name email').populate('match', 'skill1 skill2 user1 user2').lean();
 
   // Attach organizerName for frontend convenience
   meets.forEach(m => {
@@ -217,13 +219,17 @@ export const deleteMeet = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const meet = await Meet.findById(id);
   if (!meet) throw new ApiError(404, 'Meet not found');
-  if (!meet.organizer.equals(req.user._id)) throw new ApiError(403, 'Not allowed');
+  // Allow cancellation by organizer OR any attendee (by email)
+  const callerIsOrganizer = meet.organizer.equals(req.user._id);
+  const callerIsAttendee = Array.isArray(meet.attendees) && meet.attendees.includes(req.user.email);
+  if (!callerIsOrganizer && !callerIsAttendee) throw new ApiError(403, 'Not allowed');
 
   // attempt to delete calendar event
   if (meet.googleEventId) {
-    const user = await User.findById(req.user._id);
+    // Use the organizer's Google credentials to delete the calendar event when possible
+    const organizerUser = await User.findById(meet.organizer);
     try {
-      await deleteGoogleCalendarEvent(user, meet.googleEventId);
+      if (organizerUser) await deleteGoogleCalendarEvent(organizerUser, meet.googleEventId);
     } catch (err) {
       console.error('Failed to delete Google Calendar event:', err?.message || err);
     }

@@ -341,12 +341,16 @@ const BrowseSkillsPage = () => {
     }
 
     try {
+        // Ask how many hours the requester needs to learn this skill
+        const hoursInput = window.prompt('How many hours do you want to learn this skill? (enter a number)', '1');
+        const requestedHours = hoursInput ? Number(hoursInput) : null;
         await axios.post(
             'http://localhost:8000/api/v1/users/sendRequest',
             {
                 recipientId: userToConnect.user_id,
                 learnSkill: userToConnect.matchedInterest,
                 teachSkill: userToConnect.skills_they_want[0],
+                requestedHours: Number.isFinite(requestedHours) && requestedHours > 0 ? requestedHours : undefined,
             },
             { withCredentials: true }
         );
