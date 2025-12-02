@@ -5,6 +5,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { Match } from "../models/match.model.js";
 import mongoose from "mongoose";
 import { Review } from "../models/review.model.js";
+import { Skill } from "../models/skill.model.js";
 
 export const options = {
   httpOnly: true,
@@ -588,6 +589,69 @@ const getUserProfileById = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, userProfile, "User profile fetched successfully"));
 });
 
+// New function to get category of a skill
+const getCategory = asyncHandler(async (req, res) => {
+  const { skill } = req.body; // Expecting skill in the request body
+
+  if (!skill) {
+    throw new ApiError(400, "Skill is required in the request body");
+  }
+
+  // Find the skill in the Skill model
+  const skillData = await Skill.findOne({ skill: skill.toLowerCase() }); // Assuming skills are stored in lowercase
+
+  if (!skillData) {
+    // If skill not found, return a 404 or a specific message
+    // For now, let's assume we can return a default or null category
+    return res.status(200).json(new ApiResponse(200, { category: null }, "Skill not found, category is null"));
+  }
+
+  // Return the category
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { category: skillData.category }, "Skill category fetched successfully"));
+});
+
+// New function to add a skill with its category
+const addSkill = asyncHandler(async (req, res) => {
+  const { skill, category } = req.body;
+
+  if (!skill || !category) {
+    throw new ApiError(400, "Skill and category are required in the request body");
+  }
+
+  const existingSkill = await Skill.findOne({ skill: skill.toLowerCase() });
+  if (existingSkill) {
+    throw new ApiError(409, "Skill already exists");
+  }
+
+  const newSkill = await Skill.create({
+    skill: skill.toLowerCase(),
+    category: category.toLowerCase(),
+  });
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, newSkill, "Skill added successfully"));
+});
+
+// New function to get all skills from the Skill model
+const getAllSk = asyncHandler(async (req, res) => {
+  // Fetch all skills and their categories
+  const skills = await Skill.find({}).select("skill category"); 
+
+  if (!skills) {
+    throw new ApiError(500, "Failed to fetch skills");
+  }
+
+  // Map the skills to the desired format: an array of skill names
+  const skillNames = skills.map(skill => skill.skill);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, skillNames, "Skills fetched successfully"));
+});
+
 
 export {
   registerUser,
@@ -601,6 +665,9 @@ export {
   respondRequest,
   getAllSkills, // Export the new function
   getAllConnections, // Export the new function
-  getUserProfileById
+  getUserProfileById,
+  getCategory, // Export the new function
+  addSkill, // Export the new function
+  getAllSk // Export the new function
 };
 export { getCurrentUser };
