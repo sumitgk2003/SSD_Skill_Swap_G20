@@ -6,6 +6,7 @@ import { Match } from "../models/match.model.js";
 import mongoose from "mongoose";
 import { Review } from "../models/review.model.js";
 import { Skill } from "../models/skill.model.js";
+import { Notification } from "../models/notification.model.js";
 
 export const options = {
   httpOnly: true,
@@ -398,6 +399,21 @@ const sendRequest = asyncHandler(async (req, res) => {
     status: "pending",
   });
 
+  // create notification for recipient
+  try {
+    const sender = await User.findById(senderId).select('name');
+    await Notification.create({
+      user: recipientId,
+      actor: senderId,
+      type: 'match.request',
+      title: `${sender?.name || 'Someone'} wants to connect`,
+      body: `${sender?.name || 'A user'} offered to teach ${teachSkill} and requests ${learnSkill}`,
+      data: { matchId: newMatch._id }
+    });
+  } catch (err) {
+    console.error('Failed to create notification for match request:', err);
+  }
+
   return res
     .status(201)
     .json(
@@ -510,6 +526,24 @@ const respondRequest = asyncHandler(async (req, res) => {
   // 5. Update the status
   matchRequest.status = status;
   await matchRequest.save();
+
+  // notify the requester if accepted
+  if (status === 'accepted') {
+    try {
+      const accepter = await User.findById(currentUser).select('name');
+      const requesterId = matchRequest.user1;
+      await Notification.create({
+        user: requesterId,
+        actor: currentUser,
+        type: 'match.accepted',
+        title: `${accepter?.name || 'A user'} accepted your connection request`,
+        body: `${accepter?.name || 'The user'} accepted your request to connect for ${matchRequest.skill1}`,
+        data: { matchId: matchRequest._id }
+      });
+    } catch (err) {
+      console.error('Failed to create notification for accepted match:', err);
+    }
+  }
 
   return res
     .status(200)

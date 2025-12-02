@@ -68,6 +68,7 @@ import adminRouter from "./routes/admin.routes.js";
 import sessionRouter from "./routes/session.routes.js";
 import reviewRouter from "./routes/review.routes.js";
 import disputeRouter from "./routes/dispute.routes.js";
+import notificationRouter from './routes/notification.routes.js';
 
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/auth", authRouter);
@@ -79,6 +80,7 @@ app.use("/api/v1/messages", messageRouter);
 app.use('/api/v1/sessions', sessionRouter);
 app.use('/api/v1/reviews', reviewRouter);
 app.use('/api/v1/disputes', disputeRouter);
+app.use('/api/v1/notifications', notificationRouter);
 
 // 5. Export 'io' and 'Reciever' so the Controller can import them
 export { app, io, server };
