@@ -1,24 +1,38 @@
-import {Router} from "express";
-import {registerUser,loginUser,logoutUser,updateProfile,
-findMatches,sendRequest,getPendingRequests,getConnectedUsers,
-respondRequest,getAllSkills,getCurrentUser,getAllConnections,
-getUserProfileById,getCategory,addSkill,getAllSk,
-getAllCategory,getCategoryMatches
-getUserProfileById,getCategory,addSkill,getAllSk, updateMatchProgress
+import { Router } from "express";
+import {
+	registerUser,
+	loginUser,
+	logoutUser,
+	updateProfile,
+	findMatches,
+	sendRequest,
+	getPendingRequests,
+	getConnectedUsers,
+	respondRequest,
+	getAllSkills,
+	getAllConnections,
+	getCurrentUser,
+	getUserProfileById,
+	getCategory,
+	addSkill,
+	getAllSk,
+	getAllCategory,
+	getCategoryMatches,
+	updateMatchProgress,
 } from "../controllers/user.controller.js";
 
-import {verifyJWT} from "../middlewares/auth.middleware.js";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
 
-const router=Router();  
+const router = Router();
 
+// Public routes
 router.route("/register").post(registerUser);
 router.route("/login").post(loginUser);
 router.route("/me").get(verifyJWT, getCurrentUser);
 
-//secured routes
-
-router.route("/logout").post(verifyJWT,logoutUser);
-router.route("/updateProfile").post(verifyJWT,updateProfile);
+// Secured routes
+router.route("/logout").post(verifyJWT, logoutUser);
+router.route("/updateProfile").post(verifyJWT, updateProfile);
 router.route("/getMatches").post(verifyJWT, findMatches);
 
 router.route("/sendRequest").post(verifyJWT, sendRequest);

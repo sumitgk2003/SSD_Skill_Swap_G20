@@ -670,31 +670,6 @@ const BrowseSkillsPage = () => {
     const handleBookCoach = (coach) => {
         alert(`Booking functionality for ${coach.name} ($${coach.rate}/hr) coming soon!`);
     };
-    try {
-        // Ask how many hours the requester needs to learn this skill
-        const hoursInput = window.prompt('How many hours do you want to learn this skill? (enter a number)', '1');
-        const requestedHours = hoursInput ? Number(hoursInput) : null;
-        await axios.post(
-            'http://localhost:8000/api/v1/users/sendRequest',
-            {
-                recipientId: userToConnect.user_id,
-                learnSkill: userToConnect.matchedInterest,
-                teachSkill: userToConnect.skills_they_want[0],
-                requestedHours: Number.isFinite(requestedHours) && requestedHours > 0 ? requestedHours : undefined,
-            },
-            { withCredentials: true }
-        );
-        setRequestedUsers(prev => new Set(prev).add(userToConnect.user_id));
-    } catch (error) {
-        console.error("Error sending connection request:", error);
-        alert(error.response?.data?.message || 'Failed to send request.');
-    }
-  };
-  
-  const handleBookCoach = (coach) => {
-      // Placeholder for booking logic
-      alert(`Booking functionality for ${coach.name} ($${coach.rate}/hr) coming soon!`);
-  };
 
     const getConnectionStatus = (userId) => {
         return requestedUsers.has(userId) ? 'requested' : 'none';
