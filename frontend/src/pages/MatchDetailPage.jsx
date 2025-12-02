@@ -425,9 +425,10 @@ const MeetingsSection = ({ matchId, matchUser }) => {
             });
                 console.log('GET /api/v1/meets response', res?.data);
             if (res.data && res.data.success) {
-                // Filter meetings by match ID
+                // Filter meetings by match ID. Handle both populated `match` object and raw id.
                 const filteredMeetings = res.data.data.filter((meet) => {
-                    return String(meet.match) === String(matchId);
+                    const matchIdFromMeet = meet.match && (meet.match._id || meet.match);
+                    return String(matchIdFromMeet) === String(matchId);
                 });
                     console.log('filteredMeetings for matchId', matchId, filteredMeetings);
 
@@ -445,6 +446,7 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                     // provide explicit fields used in rendering
                     zoomUrl: m.zoomJoinUrl || null,
                     googleCalendarUrl: m.googleEventHtmlLink || null,
+                    skillBeingTaught: m.skillBeingTaught || null,
                 }));
                 
                 // log mapped meetings and participant checks for debugging
@@ -872,6 +874,11 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
                                     <div style={meetingInfoStyle}>
                                         <h4 style={{ ...meetingTitleStyle, marginBottom: '0.75rem', fontWeight: 'bold' }}>{meeting.title}</h4>
+                                        {meeting.skillBeingTaught && (
+                                            <p style={{ ...meetingDetailsStyle, color: 'var(--accent-primary)', fontWeight: '600', marginBottom: '0.5rem' }}>
+                                                📚 Teaching: <strong>{meeting.skillBeingTaught}</strong>
+                                            </p>
+                                        )}
                                         <p style={meetingDetailsStyle}>
                                             <span style={pillStyle(meeting.type)}>
                                                 {meeting.type === 'online' ? '🌐 Online' : '📍 In-Person'}

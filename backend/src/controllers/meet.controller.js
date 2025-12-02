@@ -80,7 +80,21 @@ export const createMeet = asyncHandler(async (req, res) => {
     console.error('Failed to pre-create session for meeting:', err);
   }
 
-  return res.status(201).json(new ApiResponse(201, { meet, session: createdSession }, 'Meet created'));
+  // Populate match and organizer for the response to include skill info
+  const meetWithDetails = await Meet.findById(meet._id).populate('match').populate('organizer', 'name email _id');
+  
+  // Determine which skill is being taught based on role and match details
+  if (meetWithDetails.match && role) {
+    if (role === 'teach') {
+      const organizerIsUser1 = meetWithDetails.match.user1.toString() === req.user._id.toString();
+      meetWithDetails.skillBeingTaught = organizerIsUser1 ? meetWithDetails.match.skill1 : meetWithDetails.match.skill2;
+    } else if (role === 'learn') {
+      const organizerIsUser1 = meetWithDetails.match.user1.toString() === req.user._id.toString();
+      meetWithDetails.skillBeingTaught = organizerIsUser1 ? meetWithDetails.match.skill2 : meetWithDetails.match.skill1;
+    }
+  }
+
+  return res.status(201).json(new ApiResponse(201, { meet: meetWithDetails, session: createdSession }, 'Meet created'));
 });
 
 export const getMyMeets = asyncHandler(async (req, res) => {
@@ -90,11 +104,23 @@ export const getMyMeets = asyncHandler(async (req, res) => {
 
   const meets = await Meet.find({
     $or: [ { organizer: req.user._id }, { attendees: user.email } ]
-  }).sort({ dateAndTime: 1 }).populate('organizer', 'name email').lean();
+  }).sort({ dateAndTime: 1 }).populate('organizer', 'name email _id').populate('match');
 
-  // attach organizerName for frontend convenience
+  // attach organizerName and determine skillBeingTaught for frontend convenience
   meets.forEach(m => {
     if (m.organizer && m.organizer.name) m.organizerName = m.organizer.name;
+    
+    // Determine which skill is being taught based on who is organizing
+    if (m.match) {
+      const organizerIsUser1 = m.match.user1.toString() === m.organizer._id.toString();
+      
+      // If organizer is user1, they teach skill1; if organizer is user2, they teach skill2
+      if (organizerIsUser1) {
+        m.skillBeingTaught = m.match.skill1;
+      } else {
+        m.skillBeingTaught = m.match.skill2;
+      }
+    }
   });
 
   return res.status(200).json(new ApiResponse(200, meets, 'User meets'));
