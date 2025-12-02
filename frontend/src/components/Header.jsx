@@ -4,6 +4,7 @@ import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { resetAuth } from '../store/authSlice';
 import axios from 'axios';
 import ThemeToggleButton from './ThemeToggleButton';
+import Notifications from './Notifications';
 
 const styles = {
   header: {
@@ -121,6 +122,7 @@ const Header = () => {
       </nav>
       <div style={styles.headerButtons}>
         <NavLink to="/policy" style={({isActive}) => ({...getNavLinkStyle({isActive}), marginRight: '12px'})}>Policy</NavLink>
+        <Notifications />
         <ThemeToggleButton />
         {user ? (
           <button 

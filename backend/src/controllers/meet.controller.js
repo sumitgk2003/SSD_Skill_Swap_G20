@@ -2,13 +2,14 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Meet } from "../models/meet.model.js";
-import { Session } from "../models/session.model.js";
+import { Match } from "../models/match.model.js";
+import { Notification } from "../models/notification.model.js";
 import { User } from "../models/user.model.js";
 import { createGoogleCalendarEvent, deleteGoogleCalendarEvent } from "../utils/googleCalendar.js";
 import { createZoomMeeting, deleteZoomMeeting } from "../utils/zoom.js";
 
 export const createMeet = asyncHandler(async (req, res) => {
-  const { match_id, type, date, time, duration, note, with: withUser, role } = req.body;
+  const { match_id, type, date, time, duration, note, with: withUser } = req.body;
   if (!date || !time || !duration) throw new ApiError(400, "Missing required fields");
 
   const dateTime = new Date(`${date}T${time}:00`);
@@ -21,7 +22,6 @@ export const createMeet = asyncHandler(async (req, res) => {
     match: match_id,
     durationInMinutes: duration,
     organizer: req.user._id,
-    organizerRole: role || null,
     attendees: withUser && withUser.email ? [withUser.email] : [],
   });
 
@@ -57,47 +57,85 @@ export const createMeet = asyncHandler(async (req, res) => {
     }
   }
 
-  // Optionally pre-create a Session if the scheduler specified a role and provided the other user's id
-  let createdSession = null;
-  try {
-    if (role && withUser && withUser.id) {
-      const other = await User.findById(withUser.id).select('_id');
-      if (other) {
-        const organizerId = req.user._id;
-        const tutorId = role === 'teach' ? organizerId : other._id;
-        const learnerId = role === 'teach' ? other._id : organizerId;
-        createdSession = await Session.create({
-          match: match_id || undefined,
-          meet: meet._id,
-          tutor: tutorId,
-          learner: learnerId,
-          date: dateTime,
-          durationInMinutes: duration,
-          completed: false,
-        });
+  // Notify other participant(s) in the match (if match provided)
+  if (meet.match) {
+    try {
+      const match = await Match.findById(meet.match).select('user1 user2');
+      if (match) {
+        const recipients = [];
+        if (String(match.user1) !== String(req.user._id)) recipients.push(match.user1);
+        if (String(match.user2) !== String(req.user._id)) recipients.push(match.user2);
+
+        const title = `New meeting scheduled`;
+        const body = `Meeting "${meet.title}" is scheduled for ${meet.dateAndTime.toISOString()}`;
+
+        for (const r of recipients) {
+          await Notification.create({
+            user: r,
+            actor: req.user._id,
+            type: 'meet.created',
+            title,
+            body,
+            data: { meetId: meet._id, matchId: meet.match }
+          });
+        }
       }
+    } catch (err) {
+      console.error('Failed to create notifications for new meet:', err);
     }
-  } catch (err) {
-    console.error('Failed to pre-create session for meeting:', err);
   }
 
-  // Populate match and organizer for the response to include skill info
-  const meetWithDetails = await Meet.findById(meet._id).populate('match').populate('organizer', 'name email _id');
-  
-  // Determine which skill is being taught based on role and match details
-  if (meetWithDetails.match && role) {
-    if (role === 'teach') {
-      const organizerIsUser1 = meetWithDetails.match.user1.toString() === req.user._id.toString();
-      meetWithDetails.skillBeingTaught = organizerIsUser1 ? meetWithDetails.match.skill1 : meetWithDetails.match.skill2;
-    } else if (role === 'learn') {
-      const organizerIsUser1 = meetWithDetails.match.user1.toString() === req.user._id.toString();
-      meetWithDetails.skillBeingTaught = organizerIsUser1 ? meetWithDetails.match.skill2 : meetWithDetails.match.skill1;
+  return res.status(201).json(new ApiResponse(201, meet, 'Meet created'));
+});
+
+// Reschedule a meet
+export const rescheduleMeet = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { date, time, duration } = req.body;
+
+  if (!id) throw new ApiError(400, 'Meet id is required');
+  const meet = await Meet.findById(id);
+  if (!meet) throw new ApiError(404, 'Meet not found');
+  if (!meet.organizer.equals(req.user._id)) throw new ApiError(403, 'Not allowed');
+
+  if (date && time) {
+    const dt = new Date(`${date}T${time}:00`);
+    if (isNaN(dt.getTime())) throw new ApiError(400, 'Invalid date/time');
+    meet.dateAndTime = dt;
+  }
+  if (duration) meet.durationInMinutes = duration;
+
+  await meet.save();
+
+  // Attempt to notify the other user(s) in the match (if present)
+  if (meet.match) {
+    try {
+      const match = await Match.findById(meet.match).select('user1 user2');
+      if (match) {
+        const recipients = [];
+        if (String(match.user1) !== String(req.user._id)) recipients.push(match.user1);
+        if (String(match.user2) !== String(req.user._id)) recipients.push(match.user2);
+
+        const title = `Meeting rescheduled`;
+        const body = `Meeting "${meet.title}" was rescheduled to ${meet.dateAndTime.toISOString()}`;
+
+        for (const r of recipients) {
+          await Notification.create({
+            user: r,
+            actor: req.user._id,
+            type: 'meet.rescheduled',
+            title,
+            body,
+            data: { meetId: meet._id }
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Failed to create notifications for reschedule:', err);
     }
-    // persist to meet document so subsequent fetches include it
-    try { meet.skillBeingTaught = meetWithDetails.skillBeingTaught; await meet.save(); } catch (e) { console.error('Failed to persist skillBeingTaught on meet', meet._id, e); }
   }
 
-  return res.status(201).json(new ApiResponse(201, { meet: meetWithDetails, session: createdSession }, 'Meet created'));
+  return res.status(200).json(new ApiResponse(200, meet, 'Meet rescheduled'));
 });
 
 export const getMyMeets = asyncHandler(async (req, res) => {
@@ -107,34 +145,11 @@ export const getMyMeets = asyncHandler(async (req, res) => {
 
   const meets = await Meet.find({
     $or: [ { organizer: req.user._id }, { attendees: user.email } ]
-  }).sort({ dateAndTime: 1 }).populate('organizer', 'name email _id').populate('match');
+  }).sort({ dateAndTime: 1 }).populate('organizer', 'name email').lean();
 
-  // attach organizerName and determine skillBeingTaught for frontend convenience
+  // attach organizerName for frontend convenience
   meets.forEach(m => {
     if (m.organizer && m.organizer.name) m.organizerName = m.organizer.name;
-    
-    // Prefer persisted skillBeingTaught if present; otherwise determine it based on who is organizing
-    if (m.skillBeingTaught) {
-      // already present on document — nothing to do
-    } else if (m.match) {
-      try {
-        let organizerId = null;
-        if (m.organizer) {
-          if (typeof m.organizer === 'object' && m.organizer._id) organizerId = m.organizer._id.toString();
-          else organizerId = m.organizer.toString();
-        }
-
-        const user1Id = m.match.user1 ? m.match.user1.toString() : null;
-        if (organizerId && user1Id && organizerId === user1Id) {
-          m.skillBeingTaught = m.match.skill1;
-        } else {
-          m.skillBeingTaught = m.match.skill2;
-        }
-      } catch (e) {
-        console.error('Failed to determine skillBeingTaught for meet', m._id, e);
-        m.skillBeingTaught = m.match.skill1 || m.match.skill2 || null;
-      }
-    }
   });
 
   return res.status(200).json(new ApiResponse(200, meets, 'User meets'));
@@ -173,11 +188,7 @@ export const deleteMeet = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const meet = await Meet.findById(id);
   if (!meet) throw new ApiError(404, 'Meet not found');
-  // allow organizer or an attendee (by email) to cancel
-  const requestingUser = await User.findById(req.user._id).select('email');
-  const isOrganizer = meet.organizer && meet.organizer.equals && meet.organizer.equals(req.user._id);
-  const isAttendee = Array.isArray(meet.attendees) && requestingUser && meet.attendees.includes(requestingUser.email);
-  if (!isOrganizer && !isAttendee) throw new ApiError(403, 'Not allowed');
+  if (!meet.organizer.equals(req.user._id)) throw new ApiError(403, 'Not allowed');
 
   // attempt to delete calendar event
   if (meet.googleEventId) {
@@ -200,83 +211,4 @@ export const deleteMeet = asyncHandler(async (req, res) => {
 
   await meet.deleteOne();
   return res.status(200).json(new ApiResponse(200, {}, 'Meet deleted'));
-});
-
-export const rescheduleMeet = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { date, time, duration } = req.body;
-
-  if (!date || !time || !duration) throw new ApiError(400, 'date, time and duration are required');
-
-  const meet = await Meet.findById(id);
-  if (!meet) throw new ApiError(404, 'Meet not found');
-  // allow organizer or an attendee to reschedule
-  const requestingUser = await User.findById(req.user._id).select('email');
-  const isOrganizer = meet.organizer && meet.organizer.equals && meet.organizer.equals(req.user._id);
-  const isAttendee = Array.isArray(meet.attendees) && requestingUser && meet.attendees.includes(requestingUser.email);
-  if (!isOrganizer && !isAttendee) throw new ApiError(403, 'Not allowed');
-
-  const dateTime = new Date(`${date}T${time}:00`);
-  if (isNaN(dateTime.getTime())) throw new ApiError(400, 'Invalid date/time');
-
-  // Update meet fields
-  meet.dateAndTime = dateTime;
-  meet.durationInMinutes = duration;
-  await meet.save();
-
-  // If there is a pre-created session for this meet that is not completed, update it
-  try {
-    const session = await Session.findOne({ meet: meet._id, completed: false });
-    if (session) {
-      session.date = dateTime;
-      session.durationInMinutes = duration;
-      await session.save();
-    }
-  } catch (err) {
-    console.error('Failed to update linked session during reschedule:', err);
-  }
-
-  // Attempt to update calendar/zoom by deleting old and recreating if possible
-  try {
-    const user = await User.findById(req.user._id);
-    if (meet.googleEventId && (user.googleRefreshToken || user.googleAccessToken)) {
-      try {
-        await deleteGoogleCalendarEvent(user, meet.googleEventId);
-      } catch (e) {
-        console.error('Failed to delete old Google event during reschedule:', e);
-      }
-      try {
-        const event = await createGoogleCalendarEvent(user, meet);
-        if (event && event.id) {
-          meet.googleEventId = event.id;
-          meet.googleEventHtmlLink = event.htmlLink || meet.googleEventHtmlLink;
-          await meet.save();
-        }
-      } catch (e) {
-        console.error('Failed to create new Google event during reschedule:', e);
-      }
-    }
-
-    if (meet.zoomMeetingId) {
-      try {
-        await deleteZoomMeeting(meet.zoomMeetingId);
-      } catch (e) {
-        console.error('Failed to delete old Zoom meeting during reschedule:', e);
-      }
-      try {
-        const z = await createZoomMeeting(meet);
-        if (z && z.id) {
-          meet.zoomMeetingId = z.id;
-          meet.zoomJoinUrl = z.join_url || meet.zoomJoinUrl;
-          await meet.save();
-        }
-      } catch (e) {
-        console.error('Failed to create new Zoom meeting during reschedule:', e);
-      }
-    }
-  } catch (err) {
-    console.error('Calendar/Zoom reschedule helpers failed:', err);
-  }
-
-  return res.status(200).json(new ApiResponse(200, meet, 'Meet rescheduled'));
 });
