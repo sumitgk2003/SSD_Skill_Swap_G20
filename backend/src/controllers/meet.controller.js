@@ -14,6 +14,35 @@ export const createMeet = asyncHandler(async (req, res) => {
   const dateTime = new Date(`${date}T${time}:00`);
   if (isNaN(dateTime.getTime())) throw new ApiError(400, "Invalid date/time");
 
+  // Check for scheduling conflicts: ensure organizer and attendees don't have overlapping meets
+  const endTime = new Date(dateTime.getTime() + duration * 60000); // duration in minutes
+  
+  // Build list of people involved in this meet
+  const peopleInvolved = [req.user._id];
+  if (withUser && withUser.id) {
+    peopleInvolved.push(withUser.id);
+  }
+  
+  // Query for existing meets that overlap with the requested time slot
+  // A meet overlaps if: existingStart < requestedEnd AND existingEnd > requestedStart
+  const conflictingMeets = await Meet.find({
+    $or: [
+      { organizer: { $in: peopleInvolved } },
+      { attendees: withUser && withUser.email ? withUser.email : null }
+    ],
+    dateAndTime: { $lt: endTime },
+    $expr: {
+      $gt: [
+        { $add: ['$dateAndTime', { $multiply: ['$durationInMinutes', 60000] }] },
+        dateTime
+      ]
+    }
+  });
+
+  if (conflictingMeets && conflictingMeets.length > 0) {
+    throw new ApiError(409, 'One or more participants already have a meeting scheduled at this time');
+  }
+
   const meet = new Meet({
     meetType: type || 'online',
     dateAndTime: dateTime,
