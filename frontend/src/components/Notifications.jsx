@@ -13,6 +13,9 @@ const styles = {
     position: 'relative',
     padding: '6px',
     borderRadius: 8,
+    outline: 'none',
+    boxShadow: 'none',
+    WebkitTapHighlightColor: 'transparent',
   },
   badge: {
     position: 'absolute',
