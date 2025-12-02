@@ -717,6 +717,72 @@ const getAllSk = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, skillNames, "Skills fetched successfully"));
 });
 
+// New function to get all unique categories from the Skill model
+const getAllCategory = asyncHandler(async (req, res) => {
+  const uniqueCategories = await Skill.distinct("category"); // Use distinct to get unique values
+
+  if (!uniqueCategories) {
+    throw new ApiError(500, "Failed to fetch categories");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, uniqueCategories, "All unique categories fetched successfully"));
+});
+
+// New function to get users by category
+const getCategoryMatches = asyncHandler(async (req, res) => {
+  const { category } = req.body;
+  const userId = req.user._id;
+
+  if (!category) {
+    throw new ApiError(400, "Category is required in the request body");
+  }
+
+  // 1. Find all skills belonging to the specified category
+  const skillsInCategory = await Skill.find({ category: category.toLowerCase() }).select("skill");
+  const skillNames = skillsInCategory.map(s => s.skill);
+
+  if (skillNames.length === 0) {
+    return res.status(200).json(new ApiResponse(200, [], "No skills found for this category"));
+  }
+
+  // 2. Fetch the current user's skills to see what they can offer
+  const currentUser = await User.findById(userId).select("skills");
+  if (!currentUser) {
+    throw new ApiError(404, "Current user not found");
+  }
+  const currentUserSkills = currentUser.skills || [];
+
+  // 3. Find users who have at least one skill from the category AND are willing to teach one of the current user's skills
+  const potentialMatches = await User.find({
+    _id: { $ne: userId }, // Exclude the current user
+    skills: { $in: skillNames }, // User teaches a skill within the requested category
+    interests: { $in: currentUserSkills } // User is interested in learning one of the current user's skills
+  })
+  .select("name skills interests") // Select relevant fields
+  .lean();
+
+  // 4. Further refine: For each potential match, identify which of the current user's skills they are interested in learning
+  const formattedMatches = potentialMatches.map(user => {
+    const skillsTheyWant = user.interests.filter(interest => currentUserSkills.includes(interest));
+    
+    // Filter the user's skills to only include those from the requested category
+    const skillsTheyTeachInCategory = user.skills.filter(skill => skillNames.includes(skill));
+
+    return {
+      user_id: user._id,
+      name: user.name,
+      skills_they_teach_in_category: skillsTheyTeachInCategory,
+      skills_they_want_from_you: skillsTheyWant
+    };
+  });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, formattedMatches, "Users matching the category fetched successfully"));
+});
+
 
 export {
   registerUser,
@@ -733,6 +799,8 @@ export {
   getUserProfileById,
   getCategory, // Export the new function
   addSkill, // Export the new function
-  getAllSk // Export the new function
+  getAllSk, // Export the new function
+  getAllCategory, // Export the new function
+  getCategoryMatches // Export the new function
 };
 export { getCurrentUser };
