@@ -263,6 +263,7 @@ const DashboardPage = () => {
   const [learningMatches, setLearningMatches] = useState([]);
   const [teachingMatches, setTeachingMatches] = useState([]);
   const [sessionSummary, setSessionSummary] = useState(null);
+  const [upcomingMeets, setUpcomingMeets] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -303,6 +304,28 @@ const DashboardPage = () => {
       }
     };
 
+    const fetchUpcomingMeets = async () => {
+      try {
+        const res = await axios.get('http://localhost:8000/api/v1/meets', { withCredentials: true });
+        if (res.data && res.data.success && Array.isArray(res.data.data)) {
+          const now = Date.now();
+          // parse dates robustly and include any future meet
+          const future = res.data.data
+            .filter(meet => {
+              if (!meet || !meet.dateAndTime) return false;
+              const ts = Date.parse(meet.dateAndTime);
+              return !isNaN(ts) && ts > now;
+            })
+            .sort((a, b) => Date.parse(a.dateAndTime) - Date.parse(b.dateAndTime));
+
+          console.debug('fetchUpcomingMeets: total', res.data.data.length, 'future', future.length);
+          setUpcomingMeets(future);
+        }
+      } catch (err) {
+        console.error('Error fetching upcoming meets:', err);
+      }
+    };
+
     const fetchRequests = async () => {
       try {
         const res = await axios.get(
@@ -323,6 +346,7 @@ const DashboardPage = () => {
       fetchData();
       fetchRequests();
       fetchSessionSummary();
+      fetchUpcomingMeets();
     }
   }, [user]);
 
@@ -432,6 +456,67 @@ const DashboardPage = () => {
                 <p style={{fontSize:'1.5rem', margin:0}}>{sessionSummary.currentStreakDays || 0} days</p>
                 <small>Consecutive active days</small>
               </div>
+            </div>
+          </section>
+        )}
+
+        {upcomingMeets.length > 0 && (
+          <section style={{marginBottom: '2rem'}}>
+            <h2 style={sectionHeaderStyle}>Upcoming Meets</h2>
+            <div style={{...gridStyle, gridTemplateColumns: '1fr', gap: '1rem'}}>
+              {upcomingMeets.map(meet => {
+                const meetDate = new Date(meet.dateAndTime);
+                const dateStr = meetDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                const timeStr = meetDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                const organizerName = meet.organizerName || (meet.organizer?.name || 'Unknown');
+                const isOrganizer = meet.organizer?._id === user?.id || meet.organizer === user?.id;
+
+                return (
+                  <div key={meet._id} style={{
+                    backgroundColor: 'var(--background-secondary)',
+                    borderRadius: '12px',
+                    padding: '1.5rem',
+                    border: '1px solid var(--border-color)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '1rem'
+                  }}>
+                    <div style={{flex: 1, minWidth: '200px'}}>
+                      <h3 style={{margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)', fontWeight: 'bold'}}>
+                        {meet.title || 'Skill Swap Meet'}
+                      </h3>
+                      {meet.skillBeingTaught && (
+                        <p style={{margin: '0.3rem 0 0 0', color: 'var(--accent-primary)', fontSize: '0.95rem', fontWeight: '600'}}>
+                          📚 Teaching: <strong>{meet.skillBeingTaught}</strong>
+                        </p>
+                      )}
+                      <p style={{margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem'}}>
+                        {dateStr} at {timeStr}
+                      </p>
+                      <p style={{margin: '0.25rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem'}}>
+                        With: <strong>{meet.attendees && meet.attendees.length > 0 ? meet.attendees.join(', ') : organizerName}</strong>
+                      </p>
+                      {meet.zoomJoinUrl && (
+                        <p style={{margin: '0.5rem 0 0 0', color: 'var(--accent-primary)', fontSize: '0.85rem'}}>
+                          📹 Zoom: <a href={meet.zoomJoinUrl} target="_blank" rel="noopener noreferrer" style={{color: 'var(--accent-primary)', textDecoration: 'underline'}}>Join meeting</a>
+                        </p>
+                      )}
+                      {meet.googleEventHtmlLink && (
+                        <p style={{margin: '0.25rem 0 0 0', color: 'var(--accent-primary)', fontSize: '0.85rem'}}>
+                          📅 <a href={meet.googleEventHtmlLink} target="_blank" rel="noopener noreferrer" style={{color: 'var(--accent-primary)', textDecoration: 'underline'}}>View in Google Calendar</a>
+                        </p>
+                      )}
+                    </div>
+                    <div style={{display: 'flex', gap: '0.75rem', flexWrap: 'wrap'}}>
+                      {meet.meetType === 'online' && <span style={{display: 'inline-block', padding: '0.3rem 0.75rem', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#BFDBFE', color: '#1E40AF'}}>💻 Online</span>}
+                      {meet.meetType === 'in person' && <span style={{display: 'inline-block', padding: '0.3rem 0.75rem', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#A7F3D0', color: '#065F46'}}>📍 In Person</span>}
+                      {isOrganizer && <span style={{display: 'inline-block', padding: '0.3rem 0.75rem', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#FDE68A', color: '#92400E'}}>👤 Organizer</span>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </section>
         )}
