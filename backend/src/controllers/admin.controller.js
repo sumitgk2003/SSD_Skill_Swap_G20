@@ -1,5 +1,7 @@
 import { Admin } from "../models/admin.model.js";
 import { User } from "../models/user.model.js";
+import { Match } from "../models/match.model.js";
+import SitePolicy from '../models/policy.model.js';
 
 
  export async function createAdmin(req, res) {
@@ -200,6 +202,57 @@ export async function logoutAdmin(req, res) {
       .clearCookie('adminRefreshToken', options)
       .json({ success: true, message: 'Admin logged out' });
   } catch (err) {
+    return res.status(500).json({ success: false, message: String(err) });
+  }
+}
+
+// Admin: end (delete) a match by id
+export async function endMatchById(req, res) {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, message: 'Match id is required' });
+
+    const deleted = await Match.findByIdAndDelete(id).lean();
+    if (!deleted) return res.status(404).json({ success: false, message: 'Match not found' });
+
+    return res.json({ success: true, data: { id: deleted._id }, message: 'Match ended successfully' });
+  } catch (err) {
+    console.error('endMatchById error', err);
+    return res.status(500).json({ success: false, message: String(err) });
+  }
+}
+
+// Get site policy (public)
+export async function getSitePolicy(req, res) {
+  try {
+    let p = await SitePolicy.findOne();
+    if (!p) {
+      // create empty document so admin can edit later
+      p = await SitePolicy.create({ content: '' });
+    }
+    return res.json({ success: true, data: p });
+  } catch (err) {
+    console.error('getSitePolicy error', err);
+    return res.status(500).json({ success: false, message: String(err) });
+  }
+}
+
+// Update site policy (admin only)
+export async function updateSitePolicy(req, res) {
+  try {
+    const { content } = req.body;
+    if (typeof content !== 'string') return res.status(400).json({ success: false, message: 'content string is required' });
+
+    let p = await SitePolicy.findOne();
+    if (!p) p = await SitePolicy.create({ content });
+    else {
+      p.content = content;
+      await p.save();
+    }
+
+    return res.json({ success: true, data: p, message: 'Policy updated' });
+  } catch (err) {
+    console.error('updateSitePolicy error', err);
     return res.status(500).json({ success: false, message: String(err) });
   }
 }

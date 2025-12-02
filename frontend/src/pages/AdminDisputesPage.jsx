@@ -82,6 +82,27 @@ const AdminDisputesPage = () => {
     }
   };
 
+  const endMatch = async (matchId, disputeId) => {
+    try {
+      if (!matchId) return alert('No match id available for this dispute');
+      if (!window.confirm('Are you sure you want to end this match? This will remove the connection between the users.')) return;
+
+      await axios.delete(`http://localhost:8000/api/v1/admin/matches/${matchId}`, { withCredentials: true });
+
+      // Optionally mark dispute as resolved after ending the match
+      if (disputeId) {
+        await axios.patch(`http://localhost:8000/api/v1/disputes/${disputeId}/status`, { status: 'Resolved' }, { withCredentials: true });
+        // update local state
+        setAllDisputes((prev) => prev.map((d) => (d._id === disputeId ? { ...d, status: 'Resolved' } : d)));
+      }
+
+      alert('Match ended successfully');
+    } catch (err) {
+      console.error('Failed to end match', err);
+      alert(err.response?.data?.message || 'Failed to end match');
+    }
+  };
+
   return (
     <div style={{ padding: 36, minHeight: '100vh', background: '#f4f7fb', fontFamily: 'Inter, system-ui, Arial, sans-serif' }}>
       <div style={{ maxWidth: 1600, margin: '0 auto', padding: '0 18px' }}>
@@ -90,8 +111,8 @@ const AdminDisputesPage = () => {
           <p style={{ margin: '6px 0 0', color: '#6b7280' }}>Manage user reported disputes and moderation actions</p>
         </header>
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
-          <div style={{ position: 'relative', width: '100%', maxWidth: 520 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: '1 1 320px', minWidth: 0, maxWidth: 520 }}>
             <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} aria-hidden>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.35-4.35" stroke="#94a3b8" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/><path d="M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z" stroke="#94a3b8" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </span>
@@ -99,7 +120,7 @@ const AdminDisputesPage = () => {
               placeholder="Search disputes by reporter, reported user, skill or reason"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ padding: '12px 14px 12px 44px', width: '100%', borderRadius: 14, border: '1px solid #e6eef8', boxShadow: 'inset 0 1px 2px rgba(16,24,40,0.04)' }}
+              style={{ padding: '12px 14px 12px 44px', width: '100%', boxSizing: 'border-box', borderRadius: 14, border: '1px solid #e6eef8', boxShadow: 'inset 0 1px 2px rgba(16,24,40,0.04)' }}
             />
             {searchTerm ? (
               <button onClick={() => setSearchTerm('')} style={{ position: 'absolute', right: 6, top: 6, padding: '6px 8px', borderRadius: 8, background: '#f8fafc', border: '1px solid #e6eef8' }}>Clear</button>
@@ -109,7 +130,7 @@ const AdminDisputesPage = () => {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #e6eef8', background: '#fff' }}
+            style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #e6eef8', background: '#fff', flex: '0 0 180px', minWidth: 140 }}
           >
             <option value="All">All Statuses</option>
             <option value="Pending Review">Pending Review</option>
@@ -137,6 +158,7 @@ const AdminDisputesPage = () => {
                     <th style={{ padding: '12px 16px' }}>ID</th>
                     <th style={{ padding: '12px 16px' }}>Reporter</th>
                     <th style={{ padding: '12px 16px' }}>Reported</th>
+                    <th style={{ padding: '12px 16px' }}>Match ID</th>
                     <th style={{ padding: '12px 16px' }}>Skill</th>
                     <th style={{ padding: '12px 16px' }}>Reason</th>
                     <th style={{ padding: '12px 16px' }}>Status</th>
@@ -152,6 +174,7 @@ const AdminDisputesPage = () => {
                       <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>{dispute.reported?.name || dispute.reported?.email || '—'}</td>
                       <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>{dispute.skill || '—'}</td>
                       <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>{dispute.reason}</td>
+                        <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>{dispute.matchId ? String(dispute.matchId) : '—'}</td>
                       <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>{dispute.status}</td>
                       <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>{new Date(dispute.createdAt).toLocaleString()}</td>
                       <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>
@@ -159,6 +182,9 @@ const AdminDisputesPage = () => {
                           <div style={{ display: 'flex', gap: 8 }}>
                             <button onClick={() => updateStatus(dispute._id, 'Resolved')} style={{ padding: '8px 10px', borderRadius: 8, background: '#10b981', color: '#fff', border: 'none' }}>Resolve</button>
                             <button onClick={() => updateStatus(dispute._id, 'Rejected')} style={{ padding: '8px 10px', borderRadius: 8, background: '#ef4444', color: '#fff', border: 'none' }}>Reject</button>
+                              {dispute.matchId && (
+                                <button onClick={() => endMatch(dispute.matchId, dispute._id)} style={{ padding: '8px 10px', borderRadius: 8, background: '#6b7280', color: '#fff', border: 'none' }}>End Match</button>
+                              )}
                           </div>
                         )}
                       </td>
