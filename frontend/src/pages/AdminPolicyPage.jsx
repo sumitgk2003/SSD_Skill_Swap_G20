@@ -49,9 +49,17 @@ const AdminPolicyPage = () => {
   return (
     <div style={{ padding: 36, minHeight: '100vh', background: '#f4f7fb', fontFamily: 'Inter, system-ui, Arial, sans-serif' }}>
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 18px' }}>
-        <header style={{ marginBottom: 18 }}>
-          <h1 style={{ margin: 0, fontSize: 26, color: '#0f1724' }}>Policy</h1>
-          <p style={{ margin: '6px 0 0', color: '#6b7280' }}>Site Terms of Service and Privacy Policy</p>
+        <header style={{ marginBottom: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 26, color: '#0f1724' }}>Policy</h1>
+            <p style={{ margin: '6px 0 0', color: '#6b7280' }}>Site Terms of Service and Privacy Policy</p>
+          </div>
+          {/* Edit button placed at the top-right for admins */}
+          {isAdmin() && !editing && (
+            <div>
+              <button onClick={() => setEditing(true)} style={{ padding: '8px 12px', borderRadius: 8, background: '#0f1724', color: '#fff', border: 'none' }}>Edit</button>
+            </div>
+          )}
         </header>
 
         <article style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 10px 30px rgba(2,6,23,0.06)', color: '#111827' }}>
@@ -62,11 +70,6 @@ const AdminPolicyPage = () => {
               {!editing ? (
                 <div>
                   <div style={{ marginBottom: 12 }} dangerouslySetInnerHTML={{ __html: content || '<p style="color:#6b7280">No policy set.</p>' }} />
-                  {isAdmin() && (
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={() => setEditing(true)} style={{ padding: '8px 12px', borderRadius: 8, background: '#0f1724', color: '#fff', border: 'none' }}>Edit</button>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div>
