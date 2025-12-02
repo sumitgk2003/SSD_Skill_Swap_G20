@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { setSkills, setInterests, setBio, setAvailability, setTimezone, setPreferredFormats } from '../store/authSlice';
 import axios from 'axios';
-import { set } from 'mongoose';
 
 const styles = {
   page: {

@@ -5,6 +5,7 @@ import axios from 'axios';
 import { io } from 'socket.io-client';
 import zoomLogo from '../assets/zoom-logo.svg';
 import calendarLogo from '../assets/calendar-logo.svg';
+import ReportModal from '../components/ReportModal';
 
 // Message Component with Enhanced UI - Theme Aware
 const MessageBubble = ({ message, isOwn, senderName }) => {
@@ -68,10 +69,64 @@ const MessageBubble = ({ message, isOwn, senderName }) => {
             {isOwn && <div style={avatarStyle}>You</div>}
         </div>
     );
+    // Local fallback modal render
+    if (reportModalOpenLocal) {
+        return (
+            <>
+                <ReportModal
+                    open={reportModalOpenLocal}
+                    target={reportTargetLocal}
+                    reason={reportReasonLocal}
+                    setReason={setReportReasonLocal}
+                    onClose={() => setReportModalOpenLocal(false)}
+                    onSubmit={async () => {
+                        if (!reportTargetLocal || !reportReasonLocal.trim()) return alert('Please add a reason for the report');
+                        setSubmittingReportLocal(true);
+                        try {
+                            await axios.post('http://localhost:8000/api/v1/disputes', {
+                                reportedId: reportTargetLocal._id,
+                                matchId,
+                                skill: skillTitle,
+                                reason: reportReasonLocal,
+                            }, { withCredentials: true });
+                            setReportModalOpenLocal(false);
+                            alert('Report submitted. Admin will review it shortly.');
+                        } catch (err) {
+                            console.error('Failed to submit report', err);
+                            alert(err.response?.data?.message || 'Failed to submit report');
+                        } finally {
+                            setSubmittingReportLocal(false);
+                        }
+                    }}
+                    submitting={submittingReportLocal}
+                />
+                            
+                            {/* Report User button in header */}
+                            <button
+                                onClick={() => {
+                                    // use page-level report modal
+                                    setReportTarget(matchData.partner);
+                                    setReportReason('');
+                                    setReportModalOpen(true);
+                                }}
+                                style={{
+                                    padding: '0.4rem 0.8rem',
+                                    borderRadius: 8,
+                                    border: 'none',
+                                    backgroundColor: '#f97373',
+                                    color: '#fff',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Report User
+                            </button>
+            </>
+        );
+    }
 };
 
 // Chat Section Component - Single Match (No User List)
-const ChatSection = ({ matchId, matchUser, skillTitle }) => {
+const ChatSection = ({ matchId, matchUser, skillTitle, onOpenReport }) => {
     const { user } = useSelector((state) => state.auth);
     const [messages, setMessages] = useState([]);
     const [messageInput, setMessageInput] = useState('');
@@ -113,6 +168,12 @@ const ChatSection = ({ matchId, matchUser, skillTitle }) => {
 
         fetchMessages();
     }, [matchId]);
+
+    // Local report modal fallback if parent doesn't provide handler
+    const [reportModalOpenLocal, setReportModalOpenLocal] = useState(false);
+    const [reportTargetLocal, setReportTargetLocal] = useState(null);
+    const [reportReasonLocal, setReportReasonLocal] = useState('');
+    const [submittingReportLocal, setSubmittingReportLocal] = useState(false);
 
     // Socket: connect and listen for incoming messages
     useEffect(() => {
@@ -250,14 +311,15 @@ const ChatSection = ({ matchId, matchUser, skillTitle }) => {
         <div style={chatContainerStyle}>
             <div style={messagesContainerStyle}>
                 <>
-                    <div style={{ 
-                        borderBottom: '1px solid var(--border-color)', 
-                        padding: '1.25rem 1.5rem',
-                        backgroundColor: 'var(--background-primary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem',
-                    }}>
+                        <div style={{ 
+                            borderBottom: '1px solid var(--border-color)', 
+                            padding: '1.25rem 1.5rem',
+                            backgroundColor: 'var(--background-primary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            justifyContent: 'space-between'
+                        }}>
                         <div style={{
                             width: '40px',
                             height: '40px',
@@ -272,14 +334,22 @@ const ChatSection = ({ matchId, matchUser, skillTitle }) => {
                         }}>
                             {matchUser?.name?.charAt(0).toUpperCase()}
                         </div>
-                        <div>
-                            <h4 style={{ margin: 0, color: 'var(--text-primary)', fontWeight: '600' }}>
-                                {matchUser?.name}
-                            </h4>
-                            <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                                {skillTitle}
-                            </p>
-                        </div>
+                            <div style={{ flex: 1, marginLeft: '0.5rem' }}>
+                                <h4 style={{ margin: 0, color: 'var(--text-primary)', fontWeight: '600' }}>
+                                    {matchUser?.name}
+                                </h4>
+                                <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                    {skillTitle}
+                                </p>
+                            </div>
+                            <div style={{ marginLeft: '1rem' }}>
+                                <button onClick={() => {
+                                    if (typeof onOpenReport === 'function') return onOpenReport(matchUser);
+                                    setReportTargetLocal(matchUser);
+                                    setReportReasonLocal('');
+                                    setReportModalOpenLocal(true);
+                                }} style={{ padding: '6px 10px', borderRadius: 8, background: '#f97373', color: '#fff', border: 'none', cursor: 'pointer' }}>Report</button>
+                            </div>
                     </div>
 
                     {loading ? (
@@ -1163,6 +1233,11 @@ const MatchDetailPage = () => {
     const [matchData, setMatchData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('chat');
+    // report modal state
+    const [reportModalOpen, setReportModalOpen] = useState(false);
+    const [reportTarget, setReportTarget] = useState(null);
+    const [reportReason, setReportReason] = useState('');
+    const [submittingReport, setSubmittingReport] = useState(false);
     const [reviews, setReviews] = useState([]);
     const [avgRating, setAvgRating] = useState(null);
     const [reviewModalOpen, setReviewModalOpen] = useState(false);
@@ -1561,6 +1636,7 @@ const MatchDetailPage = () => {
                             matchId={matchId}
                             matchUser={matchData.partner}
                             skillTitle={skillTitle}
+                            onOpenReport={(userObj) => { setReportTarget(userObj); setReportReason(''); setReportModalOpen(true); }}
                         />
                     )}
                     {activeTab === 'meetings' && (
@@ -1571,6 +1647,33 @@ const MatchDetailPage = () => {
                     )}
                     
                 </div>
+                <ReportModal
+                    open={reportModalOpen}
+                    target={reportTarget}
+                    reason={reportReason}
+                    setReason={setReportReason}
+                    onClose={() => setReportModalOpen(false)}
+                    onSubmit={async () => {
+                        if (!reportTarget || !reportReason.trim()) return alert('Please add a reason for the report');
+                        setSubmittingReport(true);
+                        try {
+                            await axios.post('http://localhost:8000/api/v1/disputes', {
+                                reportedId: reportTarget._id,
+                                matchId,
+                                skill: skillTitle,
+                                reason: reportReason,
+                            }, { withCredentials: true });
+                            setReportModalOpen(false);
+                            alert('Report submitted. Admin will review it shortly.');
+                        } catch (err) {
+                            console.error('Failed to submit report', err);
+                            alert(err.response?.data?.message || 'Failed to submit report');
+                        } finally {
+                            setSubmittingReport(false);
+                        }
+                    }}
+                    submitting={submittingReport}
+                />
             </div>
         </div>
     );

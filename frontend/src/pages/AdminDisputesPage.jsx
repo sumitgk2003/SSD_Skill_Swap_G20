@@ -1,55 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+
+const SkeletonRow = () => (
+  <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: 'inset 0 0 0 1px #f1f5f9', border: '1px solid rgba(15,23,36,0.04)' }} />
+);
 
 const AdminDisputesPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
 
-  // Placeholder for dispute data
-  const allDisputes = [
-    {
-      id: '1',
-      reporter: 'User A',
-      reported: 'User B',
-      skill: 'React Development',
-      reason: 'User B did not deliver on agreed-upon skill exchange.',
-      status: 'Pending Review',
-      date: '2023-10-26',
-    },
-    {
-      id: '2',
-      reporter: 'User C',
-      reported: 'User D',
-      skill: 'Graphic Design',
-      reason: 'Miscommunication regarding project scope.',
-      status: 'Resolved',
-      date: '2023-10-20',
-    },
-    {
-      id: '3',
-      reporter: 'User E',
-      reported: 'User F',
-      skill: 'Backend Development',
-      reason: 'User F was unresponsive after initial contact.',
-      status: 'Pending Review',
-      date: '2023-10-25',
-    },
-    {
-      id: '4',
-      reporter: 'User G',
-      reported: 'User H',
-      skill: 'Content Writing',
-      reason: 'Plagiarism detected in delivered content.',
-      status: 'Rejected',
-      date: '2023-10-22',
-    },
-  ];
+  const [allDisputes, setAllDisputes] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredDisputes = allDisputes.filter((dispute) => {
+  useEffect(() => {
+    const fetchDisputes = async () => {
+      setLoading(true);
+      try {
+        const res = await axios.get('http://localhost:8000/api/v1/disputes', {
+          withCredentials: true
+        });
+        if (res.data && res.data.success) {
+          setAllDisputes(res.data.data || []);
+        } else {
+          setAllDisputes([]);
+        }
+      } catch (err) {
+        console.error('Failed to fetch disputes', err);
+        setAllDisputes([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDisputes();
+  }, []);
+
+  const filteredDisputes = (allDisputes || []).filter((dispute) => {
+    const reporterStr =
+      (dispute.reporter?.name || dispute.reporter?.email) ??
+      (typeof dispute.reporter === 'string' ? dispute.reporter : '') ??
+      '';
+
+    const reportedStr =
+      (dispute.reported?.name || dispute.reported?.email) ??
+      (typeof dispute.reported === 'string' ? dispute.reported : '') ??
+      '';
+
+    const skillStr = dispute.skill?.toString() || '';
+    const reasonStr = dispute.reason?.toString() || '';
+
+    const q = searchTerm.trim().toLowerCase();
+
     const matchesSearchTerm =
-      dispute.reporter.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      dispute.reported.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      dispute.skill.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      dispute.reason.toLowerCase().includes(searchTerm.toLowerCase());
+      !q ||
+      reporterStr.toLowerCase().includes(q) ||
+      reportedStr.toLowerCase().includes(q) ||
+      skillStr.toLowerCase().includes(q) ||
+      reasonStr.toLowerCase().includes(q);
 
     const matchesStatus =
       filterStatus === 'All' || dispute.status === filterStatus;
@@ -57,116 +64,112 @@ const AdminDisputesPage = () => {
     return matchesSearchTerm && matchesStatus;
   });
 
-  const handleResolve = (id) => {
-    console.log(`Resolve dispute with ID: ${id}`);
-    // In a real app, you'd send an API request to update the dispute status
-  };
-
-  const handleReject = (id) => {
-    console.log(`Reject dispute with ID: ${id}`);
-    // In a real app, you'd send an API request to update the dispute status
+  const updateStatus = async (id, status) => {
+    try {
+      const res = await axios.patch(
+        `http://localhost:8000/api/v1/disputes/${id}/status`,
+        { status },
+        { withCredentials: true }
+      );
+      if (res.data && res.data.success) {
+        setAllDisputes((prev) =>
+          prev.map((d) => (d._id === id ? res.data.data : d))
+        );
+      }
+    } catch (err) {
+      console.error('Failed to update dispute status', err);
+      alert(err.response?.data?.message || 'Failed to update dispute');
+    }
   };
 
   return (
-    <div className="admin-disputes-page p-6 bg-gray-50 min-h-screen">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Admin Disputes Management</h1>
+    <div style={{ padding: 36, minHeight: '100vh', background: '#f4f7fb', fontFamily: 'Inter, system-ui, Arial, sans-serif' }}>
+      <div style={{ maxWidth: 1600, margin: '0 auto', padding: '0 18px' }}>
+        <header style={{ marginBottom: 18 }}>
+          <h2 style={{ margin: 0, fontSize: 20, color: '#0f1724' }}>Disputes</h2>
+          <p style={{ margin: '6px 0 0', color: '#6b7280' }}>Manage user reported disputes and moderation actions</p>
+        </header>
 
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0 sm:space-x-4">
-        <input
-          type="text"
-          placeholder="Search disputes..."
-          className="p-2 border border-gray-300 rounded-md w-full sm:w-1/3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        <select
-          className="p-2 border border-gray-300 rounded-md w-full sm:w-1/4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-        >
-          <option value="All">All Statuses</option>
-          <option value="Pending Review">Pending Review</option>
-          <option value="Resolved">Resolved</option>
-          <option value="Rejected">Rejected</option>
-        </select>
-      </div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+          <div style={{ position: 'relative', width: '100%', maxWidth: 520 }}>
+            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} aria-hidden>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.35-4.35" stroke="#94a3b8" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/><path d="M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z" stroke="#94a3b8" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </span>
+            <input
+              placeholder="Search disputes by reporter, reported user, skill or reason"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ padding: '12px 14px 12px 44px', width: '100%', borderRadius: 14, border: '1px solid #e6eef8', boxShadow: 'inset 0 1px 2px rgba(16,24,40,0.04)' }}
+            />
+            {searchTerm ? (
+              <button onClick={() => setSearchTerm('')} style={{ position: 'absolute', right: 6, top: 6, padding: '6px 8px', borderRadius: 8, background: '#f8fafc', border: '1px solid #e6eef8' }}>Clear</button>
+            ) : null}
+          </div>
 
-      {filteredDisputes.length === 0 ? (
-        <div className="bg-white p-6 rounded-lg shadow-md text-center text-gray-600">
-          <p className="text-lg font-semibold">No disputes found matching your criteria.</p>
-          <p className="text-sm mt-2">Try adjusting your search term or filter.</p>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #e6eef8', background: '#fff' }}
+          >
+            <option value="All">All Statuses</option>
+            <option value="Pending Review">Pending Review</option>
+            <option value="Resolved">Resolved</option>
+            <option value="Rejected">Rejected</option>
+          </select>
         </div>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
-          <thead>
-            <tr style={{ backgroundColor: '#f2f2f2' }}>
-              <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Dispute ID</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Reporter</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Reported User</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Skill</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Reason</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Status</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Date</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredDisputes.map((dispute) => (
-              <tr key={dispute.id}>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{dispute.id}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{dispute.reporter}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{dispute.reported}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{dispute.skill}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{dispute.reason}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                  <span
-                    style={{
-                      padding: '2px 8px',
-                      borderRadius: '9999px',
-                      fontSize: '0.75rem',
-                      lineHeight: '1rem',
-                      fontWeight: '600',
-                      backgroundColor:
-                        dispute.status === 'Pending Review'
-                          ? '#fefcbf'
-                          : dispute.status === 'Resolved'
-                          ? '#d1fae5'
-                          : '#fee2e2',
-                      color:
-                        dispute.status === 'Pending Review'
-                          ? '#92400e'
-                          : dispute.status === 'Resolved'
-                          ? '#065f46'
-                          : '#991b1b',
-                    }}
-                  >
-                    {dispute.status}
-                  </span>
-                </td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>{dispute.date}</td>
-                <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                  {dispute.status === 'Pending Review' && (
-                    <>
-                      <button
-                        onClick={() => handleResolve(dispute.id)}
-                        style={{ marginRight: '10px', padding: '5px 10px', cursor: 'pointer', backgroundColor: '#4CAF50', color: 'white', border: 'none' }}
-                      >
-                        Resolve
-                      </button>
-                      <button
-                        onClick={() => handleReject(dispute.id)}
-                        style={{ padding: '5px 10px', cursor: 'pointer', backgroundColor: '#f44336', color: 'white', border: 'none' }}
-                      >
-                        Reject
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+
+        {loading ? (
+          <div style={{ display: 'grid', gap: 14 }}>
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+          </div>
+        ) : filteredDisputes.length === 0 ? (
+          <div style={{ background: '#fff', padding: 18, borderRadius: 10, boxShadow: '0 6px 18px rgba(2,6,23,0.06)' }}>
+            <p style={{ margin: 0, color: '#6b7280' }}>No disputes found. Try changing the search filter.</p>
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: 'grid', gap: 16 }}>
+              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 14px' }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', color: '#6b7280', fontSize: 13 }}>
+                    <th style={{ padding: '12px 16px' }}>ID</th>
+                    <th style={{ padding: '12px 16px' }}>Reporter</th>
+                    <th style={{ padding: '12px 16px' }}>Reported</th>
+                    <th style={{ padding: '12px 16px' }}>Skill</th>
+                    <th style={{ padding: '12px 16px' }}>Reason</th>
+                    <th style={{ padding: '12px 16px' }}>Status</th>
+                    <th style={{ padding: '12px 16px' }}>Created</th>
+                    <th style={{ padding: '12px 16px' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDisputes.map((dispute) => (
+                    <tr key={dispute._id} style={{ background: '#fff', borderRadius: 10, boxShadow: '0 10px 30px rgba(2,6,23,0.04)', border: '1px solid rgba(15,23,36,0.04)' }}>
+                      <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>{dispute._id}</td>
+                      <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>{dispute.reporter?.name || dispute.reporter?.email || '—'}</td>
+                      <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>{dispute.reported?.name || dispute.reported?.email || '—'}</td>
+                      <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>{dispute.skill || '—'}</td>
+                      <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>{dispute.reason}</td>
+                      <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>{dispute.status}</td>
+                      <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>{new Date(dispute.createdAt).toLocaleString()}</td>
+                      <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>
+                        {dispute.status === 'Pending Review' && (
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button onClick={() => updateStatus(dispute._id, 'Resolved')} style={{ padding: '8px 10px', borderRadius: 8, background: '#10b981', color: '#fff', border: 'none' }}>Resolve</button>
+                            <button onClick={() => updateStatus(dispute._id, 'Rejected')} style={{ padding: '8px 10px', borderRadius: 8, background: '#ef4444', color: '#fff', border: 'none' }}>Reject</button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
