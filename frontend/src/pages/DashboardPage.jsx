@@ -318,7 +318,15 @@ const DashboardPage = () => {
             })
             .sort((a, b) => Date.parse(a.dateAndTime) - Date.parse(b.dateAndTime));
 
-          console.debug('fetchUpcomingMeets: total', res.data.data.length, 'future', future.length);
+          console.log('fetchUpcomingMeets: total', res.data.data.length, 'future', future.length);
+          // log details to help debug missing skillBeingTaught
+          future.forEach(m => {
+            try {
+              console.log('meet-debug', m._id, 'skillBeingTaught=', m.skillBeingTaught, 'match.skill1=', m.match && m.match.skill1, 'match.skill2=', m.match && m.match.skill2, 'match.user1=', m.match && (m.match.user1 && (m.match.user1._id || m.match.user1)), 'organizer=', m.organizer);
+            } catch (e) {
+              console.log('meet-debug error for', m._id, e);
+            }
+          });
           setUpcomingMeets(future);
         }
       } catch (err) {
@@ -342,10 +350,12 @@ const DashboardPage = () => {
       }
     };
 
+    console.log('DashboardPage useEffect fired; user present?', !!user, 'user:', user && (user._id || user.id || user.email));
     if (user) {
       fetchData();
       fetchRequests();
       fetchSessionSummary();
+      console.log('Calling fetchUpcomingMeets()');
       fetchUpcomingMeets();
     }
   }, [user]);
@@ -469,7 +479,49 @@ const DashboardPage = () => {
                 const dateStr = meetDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
                 const timeStr = meetDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
                 const organizerName = meet.organizerName || (meet.organizer?.name || 'Unknown');
-                const isOrganizer = meet.organizer?._id === user?.id || meet.organizer === user?.id;
+                const organizerIdRaw = (meet.organizer && (meet.organizer._id || meet.organizer)) || null;
+                const organizerId = organizerIdRaw ? String(organizerIdRaw) : null;
+                const currentUserId = String(user?._id || user?.id);
+                const isOrganizer = organizerId === currentUserId;
+                
+                // Determine if user is teaching or learning based on organizerRole
+                // If user is organizer: use organizerRole; if user is attendee: opposite of organizerRole
+                let userIsTeaching = false;
+                if (isOrganizer) {
+                  userIsTeaching = meet.organizerRole === 'teach';
+                } else {
+                  userIsTeaching = meet.organizerRole === 'learn';
+                }
+                console.log('meet-role-debug', meet._id, 'organizerId=', organizerId, 'currentUserId=', currentUserId, 'isOrganizer=', isOrganizer, 'organizerRole=', meet.organizerRole, 'userIsTeaching=', userIsTeaching);
+
+                // Determine skillBeingTaught: prefer explicit field, fallback to match.skill1/skill2 when available
+                let displayedSkill = meet.skillBeingTaught || null;
+                try {
+                  if (!displayedSkill && meet.match) {
+                    const m = typeof meet.match === 'object' ? meet.match : null;
+                    if (m && (m.skill1 || m.skill2)) {
+                      // Extract match.user1 id robustly
+                      let matchUser1 = null;
+                      if (m.user1) {
+                        if (typeof m.user1 === 'object') {
+                          matchUser1 = m.user1._id ? String(m.user1._id) : null;
+                        } else {
+                          matchUser1 = String(m.user1);
+                        }
+                      }
+
+                      const organizerIsUser1 = matchUser1 && organizerId && (matchUser1 === organizerId);
+                      displayedSkill = organizerIsUser1 ? (m.skill1 || null) : (m.skill2 || null);
+                    }
+                  }
+                } catch (e) {
+                  console.log('skill fallback failed for meet', meet._id, e);
+                }
+
+                // Ensure UI uses the derived skill when original field is missing
+                if (displayedSkill && !meet.skillBeingTaught) {
+                  meet.skillBeingTaught = displayedSkill;
+                }
 
                 return (
                   <div key={meet._id} style={{
@@ -487,10 +539,18 @@ const DashboardPage = () => {
                       <h3 style={{margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)', fontWeight: 'bold'}}>
                         {meet.title || 'Skill Swap Meet'}
                       </h3>
-                      {meet.skillBeingTaught && (
-                        <p style={{margin: '0.3rem 0 0 0', color: 'var(--accent-primary)', fontSize: '0.95rem', fontWeight: '600'}}>
-                          📚 Teaching: <strong>{meet.skillBeingTaught}</strong>
-                        </p>
+                      {userIsTeaching ? (
+                        meet.skillBeingTaught && (
+                          <p style={{margin: '0.3rem 0 0 0', color: 'var(--accent-primary)', fontSize: '0.95rem', fontWeight: '600'}}>
+                            📚 Teaching: <strong>{meet.skillBeingTaught}</strong>
+                          </p>
+                        )
+                      ) : (
+                        meet.skillBeingTaught && (
+                          <p style={{margin: '0.3rem 0 0 0', color: 'var(--accent-primary)', fontSize: '0.95rem', fontWeight: '600'}}>
+                            🎓 Learning: <strong>{meet.skillBeingTaught}</strong>
+                          </p>
+                        )
                       )}
                       <p style={{margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem'}}>
                         {dateStr} at {timeStr}
@@ -512,7 +572,21 @@ const DashboardPage = () => {
                     <div style={{display: 'flex', gap: '0.75rem', flexWrap: 'wrap'}}>
                       {meet.meetType === 'online' && <span style={{display: 'inline-block', padding: '0.3rem 0.75rem', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#BFDBFE', color: '#1E40AF'}}>💻 Online</span>}
                       {meet.meetType === 'in person' && <span style={{display: 'inline-block', padding: '0.3rem 0.75rem', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#A7F3D0', color: '#065F46'}}>📍 In Person</span>}
-                      {isOrganizer && <span style={{display: 'inline-block', padding: '0.3rem 0.75rem', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#FDE68A', color: '#92400E'}}>👤 Organizer</span>}
+                      {userIsTeaching ? (
+                        <span style={{display: 'inline-flex', padding: '0.3rem 0.75rem', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#FDE68A', color: '#92400E', alignItems: 'center', gap: '0.5rem'}}>
+                          <span>📚 Teaching</span>
+                          {meet.skillBeingTaught && (
+                            <span style={{background: 'transparent', color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.85rem'}}>• {meet.skillBeingTaught}</span>
+                          )}
+                        </span>
+                      ) : (
+                        <span style={{display: 'inline-flex', padding: '0.3rem 0.75rem', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#C7D2FE', color: '#3730A3', alignItems: 'center', gap: '0.5rem'}}>
+                          <span>🎓 Learning</span>
+                          {meet.skillBeingTaught && (
+                            <span style={{background: 'transparent', color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.85rem'}}>• {meet.skillBeingTaught}</span>
+                          )}
+                        </span>
+                      )}
                     </div>
                   </div>
                 );

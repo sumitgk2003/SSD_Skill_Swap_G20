@@ -21,6 +21,7 @@ export const createMeet = asyncHandler(async (req, res) => {
     match: match_id,
     durationInMinutes: duration,
     organizer: req.user._id,
+    organizerRole: role || null,
     attendees: withUser && withUser.email ? [withUser.email] : [],
   });
 
@@ -92,6 +93,8 @@ export const createMeet = asyncHandler(async (req, res) => {
       const organizerIsUser1 = meetWithDetails.match.user1.toString() === req.user._id.toString();
       meetWithDetails.skillBeingTaught = organizerIsUser1 ? meetWithDetails.match.skill2 : meetWithDetails.match.skill1;
     }
+    // persist to meet document so subsequent fetches include it
+    try { meet.skillBeingTaught = meetWithDetails.skillBeingTaught; await meet.save(); } catch (e) { console.error('Failed to persist skillBeingTaught on meet', meet._id, e); }
   }
 
   return res.status(201).json(new ApiResponse(201, { meet: meetWithDetails, session: createdSession }, 'Meet created'));
@@ -110,15 +113,26 @@ export const getMyMeets = asyncHandler(async (req, res) => {
   meets.forEach(m => {
     if (m.organizer && m.organizer.name) m.organizerName = m.organizer.name;
     
-    // Determine which skill is being taught based on who is organizing
-    if (m.match) {
-      const organizerIsUser1 = m.match.user1.toString() === m.organizer._id.toString();
-      
-      // If organizer is user1, they teach skill1; if organizer is user2, they teach skill2
-      if (organizerIsUser1) {
-        m.skillBeingTaught = m.match.skill1;
-      } else {
-        m.skillBeingTaught = m.match.skill2;
+    // Prefer persisted skillBeingTaught if present; otherwise determine it based on who is organizing
+    if (m.skillBeingTaught) {
+      // already present on document — nothing to do
+    } else if (m.match) {
+      try {
+        let organizerId = null;
+        if (m.organizer) {
+          if (typeof m.organizer === 'object' && m.organizer._id) organizerId = m.organizer._id.toString();
+          else organizerId = m.organizer.toString();
+        }
+
+        const user1Id = m.match.user1 ? m.match.user1.toString() : null;
+        if (organizerId && user1Id && organizerId === user1Id) {
+          m.skillBeingTaught = m.match.skill1;
+        } else {
+          m.skillBeingTaught = m.match.skill2;
+        }
+      } catch (e) {
+        console.error('Failed to determine skillBeingTaught for meet', m._id, e);
+        m.skillBeingTaught = m.match.skill1 || m.match.skill2 || null;
       }
     }
   });

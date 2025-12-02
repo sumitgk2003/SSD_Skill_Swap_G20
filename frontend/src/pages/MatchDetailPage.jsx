@@ -447,6 +447,7 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                     zoomUrl: m.zoomJoinUrl || null,
                     googleCalendarUrl: m.googleEventHtmlLink || null,
                     skillBeingTaught: m.skillBeingTaught || null,
+                    organizerRole: m.organizerRole || null,
                 }));
                 
                 // log mapped meetings and participant checks for debugging
@@ -868,6 +869,14 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                             const isParticipant = isOrganizer || isAttendee;
                             const completedSession = sessions && sessions.find(s => s.meet && String(s.meet) === String(meeting.id));
                             const isCompleted = Boolean(completedSession && (completedSession.completed === true));
+                            
+                            // Determine if user is teaching or learning based on organizerRole
+                            let userIsTeaching = false;
+                            if (isOrganizer) {
+                              userIsTeaching = meeting.organizerRole === 'teach';
+                            } else {
+                              userIsTeaching = meeting.organizerRole === 'learn';
+                            }
 
                             return (
                             <div key={meeting.id} style={meetingCardStyle}>
@@ -876,7 +885,7 @@ const MeetingsSection = ({ matchId, matchUser }) => {
                                         <h4 style={{ ...meetingTitleStyle, marginBottom: '0.75rem', fontWeight: 'bold' }}>{meeting.title}</h4>
                                         {meeting.skillBeingTaught && (
                                             <p style={{ ...meetingDetailsStyle, color: 'var(--accent-primary)', fontWeight: '600', marginBottom: '0.5rem' }}>
-                                                📚 Teaching: <strong>{meeting.skillBeingTaught}</strong>
+                                                {userIsTeaching ? '📚 Teaching:' : '🎓 Learning:'} <strong>{meeting.skillBeingTaught}</strong>
                                             </p>
                                         )}
                                         <p style={meetingDetailsStyle}>

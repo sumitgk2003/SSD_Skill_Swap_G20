@@ -26,6 +26,10 @@ const matchSchema=new mongoose.Schema({
 // Organizer and Google event id for calendar sync
 matchSchema.add({
   organizer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  // Organizer's role: 'teach' if organizer is teaching, 'learn' if organizer is learning
+  organizerRole: { type: String, enum: ['teach', 'learn'], default: null },
+  // Skill being taught in this meet (persisted for clarity)
+  skillBeingTaught: { type: String, default: null },
   googleEventId: { type: String, default: null },
   attendees: { type: [String], default: [] },
   googleEventHtmlLink: { type: String, default: null },
