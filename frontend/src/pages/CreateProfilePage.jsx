@@ -321,27 +321,47 @@ const CreateProfilePage = () => {
 
   const handleSaveProfile = async() => {
     try {
+      const preferredFormatsArray = Object.keys(preferredFormatsState).filter(k => preferredFormatsState[k]);
+      const payload = {
+        interests: currentLearningSkills,
+        skills: currentTeachingSkills,
+        bio: bio,
+        timezone: localTimezone || undefined,
+        preferredFormats: preferredFormatsArray,
+        availability: availabilitySlots,
+      };
+      
+      console.log("[CreateProfilePage] Sending payload to backend:", payload);
+      
       const res = await axios.post(
         `http://localhost:8000/api/v1/users/updateProfile`,
-        {
-          interests: currentLearningSkills,
-          skills: currentTeachingSkills,
-          bio: bio,
-          timezone: localTimezone || undefined,
-          preferredFormats: Object.keys(preferredFormatsState).filter(k => preferredFormatsState[k]),
-          availability: availabilitySlots,
-        },
+        payload,
         { withCredentials: true }
       );
+      
+      console.log("[CreateProfilePage] Backend response:", res.data);
+      
       if (res.data.success) {
+        console.log("[CreateProfilePage] Dispatching Redux actions...");
         dispatch(setSkills(currentTeachingSkills));
         dispatch(setInterests(currentLearningSkills));
         dispatch(setBio(bio));
         // persist availability to redux so other pages (Profile/Edit) can show them
         dispatch(setAvailability(availabilitySlots));
+        console.log("[CreateProfilePage] Dispatched setAvailability:", availabilitySlots);
+        
         // also persist timezone and preferredFormats into redux
         dispatch(setTimezone(localTimezone || ''));
-        dispatch(setPreferredFormats(Object.keys(preferredFormatsState).filter(k => preferredFormatsState[k])));
+        console.log("[CreateProfilePage] Dispatched setTimezone:", localTimezone || '');
+        
+        dispatch(setPreferredFormats(preferredFormatsArray));
+        console.log("[CreateProfilePage] Dispatched setPreferredFormats:", preferredFormatsArray);
+        
+        // Check localStorage immediately after dispatch
+        setTimeout(() => {
+          const persistedState = localStorage.getItem('persist:root');
+          console.log("[CreateProfilePage] localStorage after dispatch:", persistedState ? JSON.parse(persistedState) : 'NOT FOUND');
+        }, 100);
       }
     } catch (error) {
       console.error("Error during profile update:", error);

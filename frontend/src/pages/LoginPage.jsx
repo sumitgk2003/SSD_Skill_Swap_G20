@@ -25,6 +25,10 @@ const LoginPage = () => {
           withCredentials: true,
         }
       );
+      
+      // console.log("[LoginPage] Backend login response:", res.data);
+      // console.log("[LoginPage] Full user object from backend:", res.data.data.user);
+      
       if (res.data.success) {
         const user = {
           name: res.data.data.user.name,
@@ -36,12 +40,29 @@ const LoginPage = () => {
         dispatch(setBio(res.data.data.user.bio || ""));
         dispatch(setSkills(res.data.data.user.skills || []));
         dispatch(setInterests(res.data.data.user.interests || []));
+        
         // store availability, timezone and preferredFormats returned from backend into redux
+        // const availability = res.data.data.user.availability || [];
+        // const timezone = res.data.data.user.timezone || '';
+        // const preferredFormats = res.data.data.user.preferredFormats || [];
+        
+        // console.log("[LoginPage] BEFORE DISPATCH - availability:", res.data.data.user.availability);
+        // console.log("[LoginPage] BEFORE DISPATCH - timezone:", res.data.data.user.timezone);
+        // console.log("[LoginPage] BEFORE DISPATCH - preferredFormats:", res.data.data.user.preferredFormats);
+
         dispatch(setAvailability(res.data.data.user.availability || []));
         dispatch(setTimezone(res.data.data.user.timezone || ''));
         dispatch(setPreferredFormats(res.data.data.user.preferredFormats || []));
-        console.log("Timezone:", res.data.data.user.timezone);
-        console.log("Preferred Formats:", res.data.data.user.preferredFormats);
+
+        // console.log("[LoginPage] Timezone after dispatch:", res.data.data.user.timezone);
+        // console.log("[LoginPage] Preferred Formats after dispatch:", res.data.data.user.preferredFormats);
+        
+        // Check localStorage immediately after dispatch
+        // setTimeout(() => {
+        //   const persistedState = localStorage.getItem('persist:root');
+        //   console.log("[LoginPage] localStorage after login dispatch:", persistedState ? JSON.parse(persistedState) : 'NOT FOUND');
+        // }, 100);
+        
         navigate("/dashboard");
       }
     } catch (error) {

@@ -13,7 +13,14 @@ export const options = {
 };
 
 const getCurrentUser = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id).select("-password -refreshToken -googleRefreshToken");
+  const user = await User.findById(req.user._id).select("-password -refreshToken");
+  console.log("[getCurrentUser] Returning user with fields:", {
+    timezone: user.timezone,
+    preferredFormats: user.preferredFormats,
+    availability: user.availability,
+    name: user.name,
+    email: user.email
+  });
   if (!user) throw new ApiError(404, "User not found");
   return res.status(200).json(new ApiResponse(200, { user }, "Current user fetched"));
 });
@@ -85,7 +92,8 @@ const loginUser = asyncHandler(async (req, res) => {
   if (!email) {
     throw new ApiError(400, "email is required");
   }
-  console.log(email, password);
+  console.log("[loginUser] Login attempt for email:", email);
+  
   const user = await User.findOne({ email });
   if (!user) {
     throw new ApiError(404, "User does not exist");
@@ -104,7 +112,15 @@ const loginUser = asyncHandler(async (req, res) => {
   const loggedInUser = await User.findById(user._id).select(
     "-password -refreshToken"
   );
-  console.log(user);
+  
+  console.log("[loginUser] Returning user object with fields:", {
+    timezone: loggedInUser.timezone,
+    preferredFormats: loggedInUser.preferredFormats,
+    availability: loggedInUser.availability,
+    name: loggedInUser.name,
+    email: loggedInUser.email
+  });
+  
   return res
     .status(200)
     .cookie("accessToken", accessToken, options)
@@ -143,7 +159,10 @@ const logoutUser = asyncHandler(async (req, res) => {
 
 const updateProfile = asyncHandler(async (req, res) => {
   const { interests, skills, bio, timezone, preferredFormats, availability } = req.body;
-  console.log("jhdbsfjk");
+  console.log("[updateProfile] Received request body:", {
+    interests, skills, bio, timezone, preferredFormats, availability
+  });
+  
   if (!Array.isArray(interests)) {
     throw new ApiError(400, "Interests must be an array");
   }
@@ -172,21 +191,33 @@ const updateProfile = asyncHandler(async (req, res) => {
       .map(slot => ({ dayOfWeek: slot.dayOfWeek, start: slot.start, end: slot.end }));
   }
   
-  console.log("Updating profile for user:", req.user._id);
-  console.log("New interests:", lowerCaseInterests);
-  console.log("New skills:", lowerCaseSkills); // Log the lowercased skills
-  console.log("New bio:", bio);
+  console.log("[updateProfile] Cleaned data:", {
+    lowerCaseSkills,
+    lowerCaseInterests,
+    bio,
+    timezone,
+    cleanedPreferredFormats,
+    cleanedAvailability
+  });
 
   const updatePayload = { interests: lowerCaseInterests, skills: lowerCaseSkills, bio };
   if (timezone && typeof timezone === 'string') updatePayload.timezone = timezone;
   if (cleanedPreferredFormats) updatePayload.preferredFormats = cleanedPreferredFormats;
   if (cleanedAvailability) updatePayload.availability = cleanedAvailability;
 
+  console.log("[updateProfile] Final updatePayload:", updatePayload);
+
   const updatedUser = await User.findByIdAndUpdate(
     req.user._id,
     updatePayload,
     { new: true }
   ).select("-password -refreshToken");
+
+  console.log("[updateProfile] Updated user from DB:", {
+    timezone: updatedUser.timezone,
+    preferredFormats: updatedUser.preferredFormats,
+    availability: updatedUser.availability
+  });
 
   if (!updatedUser) {
     throw new ApiError(500, "Failed to update profile");
