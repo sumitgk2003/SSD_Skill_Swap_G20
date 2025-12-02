@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { createAdmin, populateAdminSkills, getAdmin, loginAdmin, getAllUsers, deleteUserById, getAdminSkills, logoutAdmin } from "../controllers/admin.controller.js";
+import { endMatchById } from "../controllers/admin.controller.js";
+import { getSitePolicy, updateSitePolicy } from "../controllers/admin.controller.js";
 import { verifyJWT, verifyAdminJWT, requireAdmin } from "../middlewares/auth.middleware.js";
 
 const router = Router();
@@ -23,5 +25,11 @@ router.delete('/users/:id', verifyAdminJWT, requireAdmin, deleteUserById);
 router.get('/skills', verifyAdminJWT, requireAdmin, getAdminSkills);
 // Admin logout
 router.post('/logout', verifyAdminJWT, requireAdmin, logoutAdmin);
+// Admin: end (delete) a match by id
+router.delete('/matches/:id', verifyAdminJWT, requireAdmin, endMatchById);
+
+// Site policy: public GET, admin PUT
+router.get('/policy', getSitePolicy);
+router.put('/policy', verifyAdminJWT, requireAdmin, updateSitePolicy);
 
 export default router;

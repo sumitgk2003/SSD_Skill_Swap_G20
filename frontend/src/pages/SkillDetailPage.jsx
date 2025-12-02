@@ -67,14 +67,22 @@ const MessageBubble = ({ message, isOwn, senderName }) => {
     );
 };
 
+import ReportModal from '../components/ReportModal';
+
 // Chat Section Component
-const ChatSection = ({ skillId, skillTitle, matchedUsers }) => {
+const ChatSection = ({ skillId, skillTitle, matchedUsers, onOpenReport }) => {
     const { user } = useSelector((state) => state.auth);
     const [selectedUser, setSelectedUser] = useState(null);
     const [messages, setMessages] = useState([]);
     const [messageInput, setMessageInput] = useState('');
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef(null);
+
+    // Report (dispute) modal state (local fallback if parent doesn't provide handler)
+    const [reportModalOpenLocal, setReportModalOpenLocal] = useState(false);
+    const [reportTargetLocal, setReportTargetLocal] = useState(null); // user object being reported
+    const [reportReasonLocal, setReportReasonLocal] = useState('');
+    const [submittingReportLocal, setSubmittingReportLocal] = useState(false);
 
     // Auto-scroll to latest message
     const scrollToBottom = () => {
@@ -145,6 +153,32 @@ const ChatSection = ({ skillId, skillTitle, matchedUsers }) => {
         overflow: 'hidden',
         background: 'var(--background-secondary)',
         border: '1px solid var(--border-color)',
+    };
+
+    // openReportFor replaced by onOpenReport prop passed from parent
+
+    const submitReport = async () => {
+        if (!reportTarget || !reportReason.trim()) return alert('Please add a reason for the report');
+        setSubmittingReport(true);
+        try {
+            await axios.post(
+                'http://localhost:8000/api/v1/disputes',
+                {
+                    reportedId: reportTarget._id,
+                    matchId: reportTarget.matchId,
+                    skill: skillTitle,
+                    reason: reportReason,
+                },
+                { withCredentials: true }
+            );
+            setReportModalOpen(false);
+            alert('Report submitted. Admin will review it shortly.');
+        } catch (err) {
+            console.error('Failed to submit report', err);
+            alert(err.response?.data?.message || 'Failed to submit report');
+        } finally {
+            setSubmittingReport(false);
+        }
     };
 
     const usersListStyle = {
@@ -270,6 +304,7 @@ const ChatSection = ({ skillId, skillTitle, matchedUsers }) => {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.75rem',
+                            justifyContent: 'space-between'
                         }}>
                             <div style={{
                                 width: '40px',
@@ -285,13 +320,26 @@ const ChatSection = ({ skillId, skillTitle, matchedUsers }) => {
                             }}>
                                 {selectedUser.name.charAt(0).toUpperCase()}
                             </div>
-                            <div>
+                            <div style={{ flex: 1, marginLeft: '0.5rem' }}>
                                 <h4 style={{ margin: 0, color: 'var(--text-primary)', fontWeight: '600' }}>
                                     {selectedUser.name}
                                 </h4>
                                 <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                                     {selectedUser.email}
                                 </p>
+                            </div>
+                                <div style={{ marginLeft: '1rem' }}>
+                                <button
+                                    onClick={() => {
+                                        if (typeof onOpenReport === 'function') return onOpenReport(selectedUser);
+                                        setReportTargetLocal(selectedUser);
+                                        setReportReasonLocal('');
+                                        setReportModalOpenLocal(true);
+                                    }}
+                                    style={{ padding: '6px 10px', borderRadius: 8, background: '#f97373', color: '#fff', border: 'none', cursor: 'pointer' }}
+                                >
+                                    Report
+                                </button>
                             </div>
                         </div>
 
@@ -376,7 +424,49 @@ const ChatSection = ({ skillId, skillTitle, matchedUsers }) => {
             </div>
         </div>
     );
+    // Local fallback modal render
+    if (reportModalOpenLocal) {
+        return (
+            <>
+                <ReportModal
+                    open={reportModalOpenLocal}
+                    target={reportTargetLocal}
+                    reason={reportReasonLocal}
+                    setReason={setReportReasonLocal}
+                    onClose={() => setReportModalOpenLocal(false)}
+                    onSubmit={async () => {
+                        if (!reportTargetLocal || !reportReasonLocal.trim()) return alert('Please add a reason for the report');
+                        setSubmittingReportLocal(true);
+                        try {
+                            await axios.post('http://localhost:8000/api/v1/disputes', {
+                                reportedId: reportTargetLocal._id,
+                                matchId: reportTargetLocal.matchId,
+                                skill: skillTitle,
+                                reason: reportReasonLocal,
+                            }, { withCredentials: true });
+                            setReportModalOpenLocal(false);
+                            alert('Report submitted. Admin will review it shortly.');
+                        } catch (err) {
+                            console.error('Failed to submit report', err);
+                            alert(err.response?.data?.message || 'Failed to submit report');
+                        } finally {
+                            setSubmittingReportLocal(false);
+                        }
+                    }}
+                    submitting={submittingReportLocal}
+                />
+            </>
+        );
+    }
+    // Report Modal (rendered adjacent to ChatSection)
+    // Note: rendered from within ChatSection scope so it has access to state/handlers
+    ;
 };
+
+// NOTE: modal is placed as a sibling render via a small helper component pattern below
+// We render it by conditionally attaching to document.body via portal if needed, but
+// for simplicity we will render it directly in the page where ChatSection is mounted.
+
 
 // Meetings Section Component
 const MeetingsSection = ({ skillId, skillTitle, matchedUsers }) => {
@@ -543,6 +633,11 @@ const SkillDetailPage = () => {
     const [matchedUsers, setMatchedUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('chat');
+    // Report modal state (lifted up so modal can be rendered at page level)
+    const [reportModalOpen, setReportModalOpen] = useState(false);
+    const [reportTarget, setReportTarget] = useState(null);
+    const [reportReason, setReportReason] = useState('');
+    const [submittingReport, setSubmittingReport] = useState(false);
 
     // Add CSS animations
     useEffect(() => {
@@ -829,6 +924,8 @@ const SkillDetailPage = () => {
                             skillId={skillId}
                             skillTitle={skill.title}
                             matchedUsers={matchedUsers}
+                            // report props
+                            onOpenReport={(userObj) => { setReportTarget(userObj); setReportReason(''); setReportModalOpen(true); }}
                         />
                     )}
                     {activeTab === 'meetings' && (
@@ -839,6 +936,34 @@ const SkillDetailPage = () => {
                         />
                     )}
                 </div>
+                {/* Report Modal rendered at page level */}
+                <ReportModal
+                    open={reportModalOpen}
+                    target={reportTarget}
+                    reason={reportReason}
+                    setReason={setReportReason}
+                    onClose={() => setReportModalOpen(false)}
+                    onSubmit={async () => {
+                        if (!reportTarget || !reportReason.trim()) return alert('Please add a reason for the report');
+                        setSubmittingReport(true);
+                        try {
+                            await axios.post('http://localhost:8000/api/v1/disputes', {
+                                reportedId: reportTarget._id,
+                                matchId: reportTarget.matchId,
+                                skill: skill.title,
+                                reason: reportReason,
+                            }, { withCredentials: true });
+                            setReportModalOpen(false);
+                            alert('Report submitted. Admin will review it shortly.');
+                        } catch (err) {
+                            console.error('Failed to submit report', err);
+                            alert(err.response?.data?.message || 'Failed to submit report');
+                        } finally {
+                            setSubmittingReport(false);
+                        }
+                    }}
+                    submitting={submittingReport}
+                />
             </div>
         </div>
     );

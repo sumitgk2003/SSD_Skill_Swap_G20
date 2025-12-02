@@ -26,6 +26,7 @@ import AdminUsersPage from './pages/AdminUsersPage';
 import AdminSkillsPage from './pages/AdminSkillsPage';
 import AdminDisputesPage from './pages/AdminDisputesPage';
 import AdminPolicyPage from './pages/AdminPolicyPage';
+import PolicyPage from './pages/PolicyPage';
 import AdminLayout from './pages/AdminLayout';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
 // This component provides a consistent layout with a header for all pages.
@@ -67,6 +68,7 @@ const App = () => {
         {/* Public Routes */}
         <Route index element={<HomePage />} />
         <Route path="browse" element={<BrowseSkillsPage />} />
+  <Route path="policy" element={<PolicyPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="auth/success" element={<AuthSuccess />} />
         <Route path="signup" element={<SignUpPage />} />
