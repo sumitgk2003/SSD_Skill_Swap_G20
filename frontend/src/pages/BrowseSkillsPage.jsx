@@ -650,6 +650,23 @@ const BrowseSkillsPage = () => {
             teachSkill = userToConnect.skills_they_want_from_you[0]; // The skill *they* want is what *you* teach
         }
 
+        // Ask user how many hours they need to learn
+        const hoursInput = window.prompt('How many hours do you need to learn this skill? (enter a number)', '1');
+        
+        // If user cancels the prompt, return without sending request
+        if (hoursInput === null) {
+            console.log("User cancelled the request");
+            return;
+        }
+
+        const requestedHours = hoursInput ? Number(hoursInput) : null;
+
+        // Validate hours input
+        if (hoursInput !== '' && (!Number.isFinite(requestedHours) || requestedHours <= 0)) {
+            alert('Please enter a valid number of hours.');
+            return;
+        }
+
         try {
             await axios.post(
                 'http://localhost:8000/api/v1/users/sendRequest',
@@ -657,10 +674,12 @@ const BrowseSkillsPage = () => {
                     recipientId: userToConnect.user_id,
                     learnSkill: learnSkill,
                     teachSkill: teachSkill,
+                    requestedHours: Number.isFinite(requestedHours) && requestedHours > 0 ? requestedHours : undefined,
                 },
                 { withCredentials: true }
             );
             setRequestedUsers(prev => new Set(prev).add(userToConnect.user_id));
+            alert(`Connection request sent! You requested ${requestedHours || 'no specific'} hours.`);
         } catch (error) {
             console.error("Error sending connection request:", error);
             alert(error.response?.data?.message || 'Failed to send request.');

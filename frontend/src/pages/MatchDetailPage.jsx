@@ -421,7 +421,7 @@ const ChatSection = ({ matchId, matchUser, skillTitle, onOpenReport }) => {
 };
 
 // Meetings Section Component (with scheduling)
-const MeetingsSection = ({ matchId, matchUser, skillTitle, onSessionComplete }) => {
+const MeetingsSection = ({ matchId, matchUser, matchData, skillTitle, onSessionComplete }) => {
     const { user } = useSelector((state) => state.auth);
     const [meetings, setMeetings] = useState([]);
     const [sessions, setSessions] = useState([]);
@@ -723,6 +723,17 @@ const MeetingsSection = ({ matchId, matchUser, skillTitle, onSessionComplete }) 
             setErrors('Please select date and time');
             return null;
         }
+        
+        // Determine the correct skill based on the scheduled role
+        let skillBeingTaughtInMeet = null;
+        if (scheduledRole === 'teach') {
+            // Current user is teaching, so the skill being taught is what they teach
+            skillBeingTaughtInMeet = matchData?.skill_i_teach || null;
+        } else if (scheduledRole === 'learn') {
+            // Current user is learning, so the skill being taught is what they want to learn
+            skillBeingTaughtInMeet = matchData?.skill_i_learn || null;
+        }
+        
         const payload = {
             match_id: matchId,
             type: meetType === 'inperson' ? 'in person' : 'online',
@@ -732,7 +743,7 @@ const MeetingsSection = ({ matchId, matchUser, skillTitle, onSessionComplete }) 
             duration,
             with: matchUser ? { id: matchUser._id, name: matchUser.name, email: matchUser.email } : null,
             organizerRole: scheduledRole, // 'teach' or 'learn' - tells server who will be tutor/learner
-            skillBeingTaught: skillTitle || null, // skill being taught in this meeting
+            skillBeingTaught: skillBeingTaughtInMeet, // skill being taught in this meeting
         };
         return payload;
     };
@@ -1815,6 +1826,7 @@ const MatchDetailPage = () => {
                         <MeetingsSection
                             matchId={matchId}
                             matchUser={matchData.partner}
+                            matchData={matchData}
                             skillTitle={skillTitle}
                             onSessionComplete={fetchMatchStats}
                         />
